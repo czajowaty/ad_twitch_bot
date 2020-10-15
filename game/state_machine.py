@@ -1,15 +1,17 @@
 import logging
 from game import commands
-from .state_machine_context import StateMachineContext
-from .state_base import StateBase
-from .state_battle import StateBattleEvent, StateBattle, StateBattlePlayerTurn, StateBattleAttack, \
-    StateBattleUseSpell, StateBattleUseItem, StateBattleTryToFlee, StateBattleEnemyTurn
-from .state_character import StateCharacterEvent
-from .state_initialize import StateInitialize
-from .state_item import StateItemEvent
-from .state_trap import StateTrapEvent
-from .state_wait_for_event import StateWaitForEvent
-from game.state_battle import StateBattleAttack, StateBattleUseSpell, StateBattleUseItem
+from game.errors import InvalidOperation
+from game.state_base import StateBase
+from game.state_battle import StateBattleEvent, StateBattle, StateStartBattle, StateBattlePlayerTurn, \
+    StateBattleAttack, StateBattleUseSpell, StateBattleUseItem, StateBattleTryToFlee, StateBattleEnemyTurn
+from game.state_character import StateCharacterEvent, StateItemTrade, StateItemTradeAccepted, StateItemTradeRejected, \
+    StateFamiliarTrade, StateFamiliarTradeAccepted, StateFamiliarTradeRejected
+from game.state_initialize import StateInitialize
+from game.state_item import StateItemEvent
+from game.state_machine_action import StateMachineAction
+from game.state_machine_context import StateMachineContext
+from game.state_trap import StateTrapEvent
+from game.state_wait_for_event import StateWaitForEvent
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,11 @@ class StateStart(StateBase):
     pass
 
 
+class StateGameOver(StateBase):
+    def on_enter(self):
+        self._context.generate_action(commands.RESTART)
+
+
 class StateMachine:
     TRANSITIONS = {
         StateStart: {commands.STARTED: Transition.by_admin(StateInitialize)},
@@ -50,11 +57,13 @@ class StateMachine:
             commands.TRAP_EVENT: Transition.by_admin(StateTrapEvent),
             commands.CHARACTER_EVENT: Transition.by_admin(StateCharacterEvent)
         },
-        StateBattleEvent: {commands.BATTLE_STARTED: Transition.by_admin(StateBattle)},
+        StateBattleEvent: {commands.START_BATTLE: Transition.by_admin(StateStartBattle)},
+        StateStartBattle: {commands.BATTLE_STARTED: Transition.by_admin(StateBattle)},
         StateBattle: {
             commands.PLAYER_TURN: Transition.by_admin(StateBattlePlayerTurn),
             commands.ENEMY_TURN: Transition.by_admin(StateBattleEnemyTurn),
-            commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
+            commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent),
+            commands.YOU_DIED: Transition.by_admin(StateGameOver)
         },
         StateBattlePlayerTurn: {
             commands.ATTACK: Transition.by_user(StateBattleAttack),
@@ -63,6 +72,11 @@ class StateMachine:
             commands.FLEE: Transition.by_user(StateBattleTryToFlee)
         },
         StateBattleAttack: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle)},
+        StateBattleUseSpell: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle)},
+        StateBattleUseItem: {
+            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle),
+            commands.CANNOT_USE_ITEM: Transition.by_admin(StateBattlePlayerTurn)
+        },
         StateBattleTryToFlee: {
             commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
@@ -75,8 +89,24 @@ class StateMachine:
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
         },
         StateCharacterEvent: {
+            commands.START_ITEM_TRADE: Transition.by_admin(StateItemTrade),
+            commands.START_FAMILIAR_TRADE: Transition.by_admin(StateFamiliarTrade),
+            commands.START_BATTLE: Transition.by_admin(StateStartBattle),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
-        }
+        },
+        StateItemTrade: {
+            commands.TRADE_ITEM: Transition.by_user(StateItemTradeAccepted),
+            commands.REJECTED: Transition.by_user(StateItemTradeRejected)
+        },
+        StateItemTradeAccepted: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateItemTradeRejected: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateFamiliarTrade: {
+            commands.ACCEPTED: Transition.by_user(StateFamiliarTradeAccepted),
+            commands.REJECTED: Transition.by_user(StateFamiliarTradeRejected)
+        },
+        StateFamiliarTradeAccepted: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateFamiliarTradeRejected: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateGameOver: {commands.RESTART: Transition.by_admin(StateStart)}
     }
 
     def __init__(self, game_config: dict, player_name: str):
@@ -84,12 +114,19 @@ class StateMachine:
         self._state = StateStart(self._context)
 
     def on_action(self, action):
-        if not self._handle_generic_action(action):
-            self._handle_non_generic_action(action)
+        try:
+            if not self._handle_generic_action(action):
+                self._handle_non_generic_action(action)
+        except InvalidOperation as exc:
+            self._context.add_response(str(exc))
         return [f'{self._context.player_name}: {response}' for response in self._context.take_responses()]
 
-    def _handle_generic_action(self, action) -> bool:
+    def _handle_generic_action(self, action: StateMachineAction) -> bool:
         command = action.command
+        if command == commands.RESTART:
+            if action.is_given_by_admin:
+                self._state = StateStart(self._context)
+            return True
         if command == commands.SHOW_FAMILIAR_STATS:
             self._handle_familiar_stats_query()
             return True
@@ -104,20 +141,14 @@ class StateMachine:
 
     def _handle_familiar_stats_query(self):
         familiar = self._context.familiar
-        familiar_string = f'{familiar.name}, Genus: {familiar.genus.name}, LVL: {familiar.level}, ' \
-            f'HP: {familiar.hp}/{familiar.max_hp}, MP: {familiar.mp}/{familiar.max_mp}, ' \
-            f'ATK: {familiar.attack}, DEF: {familiar.defense}'
-        if familiar.has_spell():
-            spell = familiar.spell
-            familiar_string += f', spell: LVL {spell.level} {spell.traits.name}'
-        self._context.add_response(f'{familiar_string}.')
+        self._context.add_response(f"{familiar.to_string()}.")
 
     def _handle_inventory_query(self):
-        inventory_string = ', '.join(self._context.inventory)
-        self._context.add_response(f'You have: {inventory_string}.')
+        inventory_string = ', '.join(self._context.inventory.items)
+        self._context.add_response(f"You have: {inventory_string}.")
 
     def _handle_floor_query(self):
-        self._context.add_response(f'You are on {self._context.floor + 1}F.')
+        self._context.add_response(f"You are on {self._context.floor + 1}F.")
 
     def _handle_non_generic_action(self, action):
         state_transition_table = self.TRANSITIONS.get(type(self._state))
@@ -129,7 +160,6 @@ class StateMachine:
             self._on_unexpected_action(action)
         else:
             self._change_state(transition, action)
-            self._state = transition.nextState.create(self._context, action.args)
             if self._context.has_action():
                 self._handle_non_generic_action(self._context.take_action())
 

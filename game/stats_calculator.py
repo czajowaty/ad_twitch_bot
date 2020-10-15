@@ -1,5 +1,6 @@
 import math
-from .traits import UnitTraits
+from game.talents import Talents
+from game.traits import UnitTraits
 
 
 class StatsCalculator:
@@ -7,10 +8,7 @@ class StatsCalculator:
         self._unit_traits = unit_traits
 
     def hp(self, level):
-        if self._is_evolved():
-            return self._evolved_hp(level)
-        else:
-            return self._non_evolved_hp(level)
+        return self._evolved_hp(level) if self._is_evolved() else self._non_evolved_hp(level)
 
     def mp(self, level):
         return self._non_hp_stat(level, self._mp_stat_descriptor())
@@ -20,6 +18,9 @@ class StatsCalculator:
 
     def defense(self, level):
         return self._non_hp_stat(level, self._defense_stat_descriptor())
+
+    def luck(self, level):
+        return self._non_hp_stat(level, self._luck_stat_descriptor())
 
     def hp_increase(self, level):
         return self._stat_increase(level, self._unit_traits.base_hp, self.hp)
@@ -31,7 +32,10 @@ class StatsCalculator:
         return self._stat_increase(level, self._unit_traits.base_attack, self.attack)
 
     def defense_increase(self, level):
-        return self._stat_increase(level, self._unit_traits.base_defense, self.defese)
+        return self._stat_increase(level, self._unit_traits.base_defense, self.defense)
+
+    def luck_increase(self, level):
+        return self._stat_increase(level, self._unit_traits.base_luck, self.luck)
 
     def given_experience(self, level):
         base_exp_given = self._unit_traits.base_exp_given
@@ -39,6 +43,8 @@ class StatsCalculator:
         x = level - 1
         exp = base_exp_given * (x + 1)
         exp += (x * x * (base_exp_given + exp_growth * x)) // 512
+        if self._unit_traits.talents.has(Talents.GrowthPromoted):
+            exp *= 2
         return min(exp, 65535)
 
     def _evolved_hp(self, level):
@@ -75,6 +81,9 @@ class StatsCalculator:
     def _defense_stat_descriptor(self):
         return (self._unit_traits.base_defense, self._unit_traits.defense_growth, 64)
 
+    def _luck_stat_descriptor(self):
+        return (self._unit_traits.base_luck, self._unit_traits.luck_growth, 1024)
+
     def _non_hp_stat(self, level, stat_descriptor):
         if self._is_evolved():
             return self._evolved_non_hp_stat(level, stat_descriptor)
@@ -109,5 +118,5 @@ class StatsCalculator:
             return base_stat
         else:
             stat_at_level = calculate_stat(level)
-            stat_at_prev_level = calculate_stat(level)
+            stat_at_prev_level = calculate_stat(level - 1)
             return stat_at_level - stat_at_prev_level

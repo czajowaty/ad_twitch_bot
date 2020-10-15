@@ -15,5 +15,9 @@ class Talents(enum.Flag):
     DoesNotSurviveFusion = 0x400000
     SurvivesFusion = 0x800000
 
-    def has(self, talents) -> bool:
+    def has(self, talents: '__class__') -> bool:
         return (self & talents) == talents
+
+    @classmethod
+    def all(cls) -> list['__class__']:
+        return [talent for talent in Talents if talent is not Talents.Empty]

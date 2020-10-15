@@ -13,6 +13,8 @@ class UnitTraits:
         self.attack_growth = 0
         self.base_defense = 0
         self.defense_growth = 0
+        self.base_luck = 0
+        self.luck_growth = 0
         self.base_exp_given = 0
         self.exp_given_growth = 0
         self.native_genus = Genus.Empty
@@ -26,3 +28,4 @@ class SpellTraits:
         self.name = ''
         self.base_damage = 0
         self.genus = Genus.Empty
+        self.mp_cost = 0

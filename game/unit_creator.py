@@ -1,3 +1,4 @@
+from game.config import Config
 from game.spell import Spell
 from game.stats_calculator import StatsCalculator
 from game.traits import UnitTraits
@@ -13,9 +14,10 @@ class UnitCreator:
         self._spell = spell
         return self
 
-    def create(self, level) -> Unit:
+    def create(self, level, levels: Config.Levels=Config.Levels()) -> Unit:
+        # TODO: think about talents
         stats_calculator = StatsCalculator(self._unit_traits)
-        unit = Unit(self._unit_traits)
+        unit = Unit(self._unit_traits, levels)
         unit.level = level
         unit.max_hp = stats_calculator.hp(level)
         unit.hp = unit.max_hp
@@ -23,6 +25,7 @@ class UnitCreator:
         unit.mp = unit.max_mp
         unit.attack = stats_calculator.attack(level)
         unit.defense = stats_calculator.defense(level)
+        unit.luck = stats_calculator.luck(level)
         if self._spell is not None:
             unit.spell = self._spell
         return unit

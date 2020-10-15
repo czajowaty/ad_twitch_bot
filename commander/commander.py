@@ -27,17 +27,18 @@ if __name__ == '__main__':
     from game.state_machine import StateMachine
     from game.state_machine_action import StateMachineAction
 
-    #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     game_config = Config.from_file('../game_config.json')
     state_machine = StateMachine(game_config, "TestPlayer")
     responses = state_machine.on_action(StateMachineAction('started', is_given_by_admin=True))
     for response in responses:
         print(response)
-    command = ''
-    while command != 'exit':
-        command = input("Enter command: ")
-        responses = state_machine.on_action(StateMachineAction(command, is_given_by_admin=True))
+    while True:
+        command_line = input("Enter command: ")
+        splitted = command_line.split(' ')
+        command, args = splitted[0], splitted[1:]
+        if command == 'exit':
+            break
+        responses = state_machine.on_action(StateMachineAction(command, args, is_given_by_admin=True))
         for response in responses:
             print(response)
-    #state_machine.on_action(Action('battle_event'))
-    #state_machine.on_action(Action('unknown'))
