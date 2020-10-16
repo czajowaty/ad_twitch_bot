@@ -11,12 +11,35 @@ from game.items import Item
 class BattleContext:
     def __init__(self, enemy: Unit):
         self._enemy = enemy
+        self._prepare_phase_counter = 0
+        self._holy_scroll_counter = 0
         self.is_player_turn = False
         self._finished = False
 
     @property
     def enemy(self):
         return self._enemy
+
+    def start_prepare_phase(self, counter: int):
+        self._prepare_phase_counter = counter
+
+    def is_prepare_phase(self) -> bool:
+        return self._prepare_phase_counter > 0
+
+    def dec_prepare_phase_counter(self):
+        self._prepare_phase_counter -= 1
+
+    def finish_prepare_phase(self):
+        self._prepare_phase_counter = 0
+
+    def is_holy_scroll_active(self) -> bool:
+        return self._holy_scroll_counter > 0
+
+    def dec_holy_scroll_counter(self):
+        self._holy_scroll_counter -= 1
+
+    def set_holy_scroll_counter(self, counter):
+        self._holy_scroll_counter = counter
 
     def is_finished(self):
         return self._finished
@@ -26,9 +49,6 @@ class BattleContext:
 
 
 class StateMachineContext:
-
-    MAX_ITEMS = 5
-
     def __init__(self, game_config: Config, player_name: str):
         self._game_config = game_config
         self._player_name = player_name
@@ -37,7 +57,7 @@ class StateMachineContext:
         self._familiar = None
         self._inventory = Inventory()
         self._battle_context = None
-        self._item_for_trade = None
+        self._item_buffer = None
         self._familiar_for_trade = None
         self._rng = random.Random()
         self._responses = []
@@ -75,15 +95,20 @@ class StateMachineContext:
     def battle_context(self) -> BattleContext:
         return self._battle_context
 
-    def clear_item_for_trade(self):
-        self._item_for_trade = None
+    def clear_item_buffer(self):
+        self._item_buffer = None
 
-    def set_item_for_trade(self, item: Item):
-        self._item_for_trade = item
+    def buffer_item(self, item: Item):
+        if self._item_buffer is not None:
+            raise InvalidOperation(f'Item already buffered - {self._item_buffer.name}')
+        self._item_buffer = item
 
-    def take_item_for_trade(self) -> Item:
-        item = self._item_for_trade
-        self.clear_item_for_trade()
+    def peek_buffered_item(self) -> Item:
+        return self._item_buffer
+
+    def take_buffered_item(self) -> Item:
+        item = self.peek_buffered_item()
+        self.clear_item_buffer()
         return item
 
     def clear_familiar_for_trade(self):

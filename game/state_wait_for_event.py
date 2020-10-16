@@ -1,4 +1,4 @@
-from .state_base import StateBase
+from game.state_base import StateBase
 
 
 class StateWaitForEvent(StateBase):

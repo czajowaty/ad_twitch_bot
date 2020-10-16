@@ -1,5 +1,5 @@
-from .genus import Genus
-from .talents import Talents
+from game.genus import Genus
+from game.talents import Talents
 
 
 class UnitTraits:

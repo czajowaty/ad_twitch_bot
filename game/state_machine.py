@@ -2,12 +2,15 @@ import logging
 from game import commands
 from game.errors import InvalidOperation
 from game.state_base import StateBase
-from game.state_battle import StateBattleEvent, StateBattle, StateStartBattle, StateBattlePlayerTurn, \
-    StateBattleAttack, StateBattleUseSpell, StateBattleUseItem, StateBattleTryToFlee, StateBattleEnemyTurn
+from game.state_battle import StateBattleEvent, StateStartBattle, StateBattlePreparePhase, StateBattleApproach, \
+    StateBattlePhase, StateBattlePlayerTurn, StateBattleAttack, StateBattleUseSpell, StateBattleUseItem, \
+    StateBattleTryToFlee, StateBattleEnemyTurn
 from game.state_character import StateCharacterEvent, StateItemTrade, StateItemTradeAccepted, StateItemTradeRejected, \
     StateFamiliarTrade, StateFamiliarTradeAccepted, StateFamiliarTradeRejected
+from game.state_elevator import StateElevatorEvent, StateGoUp, StateElevatorOmitted, StateNextFloor
 from game.state_initialize import StateInitialize
-from game.state_item import StateItemEvent
+from game.state_item import StateItemEvent, StateItemPickUp, StateItemPickUpFullInventory, StateItemPickUpIgnored, \
+    StateItemEventFinished
 from game.state_machine_action import StateMachineAction
 from game.state_machine_context import StateMachineContext
 from game.state_trap import StateTrapEvent
@@ -55,11 +58,18 @@ class StateMachine:
             commands.BATTLE_EVENT: Transition.by_admin(StateBattleEvent),
             commands.ITEM_EVENT: Transition.by_admin(StateItemEvent),
             commands.TRAP_EVENT: Transition.by_admin(StateTrapEvent),
-            commands.CHARACTER_EVENT: Transition.by_admin(StateCharacterEvent)
+            commands.CHARACTER_EVENT: Transition.by_admin(StateCharacterEvent),
+            commands.ELEVATOR_EVENT: Transition.by_admin(StateElevatorEvent)
         },
         StateBattleEvent: {commands.START_BATTLE: Transition.by_admin(StateStartBattle)},
-        StateStartBattle: {commands.BATTLE_STARTED: Transition.by_admin(StateBattle)},
-        StateBattle: {
+        StateStartBattle: {commands.BATTLE_PREPARE_PHASE: Transition.by_admin(StateBattlePreparePhase)},
+        StateBattlePreparePhase: {
+            commands.USE_ITEM: Transition.by_user(StateBattleUseItem),
+            commands.APPROACH: Transition.by_user(StateBattleApproach),
+            commands.BATTLE_PREPARE_PHASE_FINISHED: Transition.by_admin(StateBattlePhase)
+        },
+        StateBattleApproach: {commands.BATTLE_PREPARE_PHASE_FINISHED: Transition.by_admin(StateBattlePhase)},
+        StateBattlePhase: {
             commands.PLAYER_TURN: Transition.by_admin(StateBattlePlayerTurn),
             commands.ENEMY_TURN: Transition.by_admin(StateBattleEnemyTurn),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent),
@@ -71,22 +81,48 @@ class StateMachine:
             commands.USE_ITEM: Transition.by_user(StateBattleUseItem),
             commands.FLEE: Transition.by_user(StateBattleTryToFlee)
         },
-        StateBattleAttack: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle)},
-        StateBattleUseSpell: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle)},
+        StateBattleAttack: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase)},
+        StateBattleUseSpell: {
+            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase),
+            commands.CANNOT_USE_SPELL: Transition.by_admin(StateBattlePlayerTurn)
+        },
         StateBattleUseItem: {
-            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle),
-            commands.CANNOT_USE_ITEM: Transition.by_admin(StateBattlePlayerTurn)
+            commands.BATTLE_PREPARE_PHASE_ACTION_PERFORMED: Transition.by_admin(StateBattlePreparePhase),
+            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase),
+            commands.CANNOT_USE_ITEM_PREPARE_PHASE: Transition.by_admin(StateBattlePreparePhase),
+            commands.CANNOT_USE_ITEM_BATTLE_PHASE: Transition.by_admin(StateBattlePlayerTurn)
         },
         StateBattleTryToFlee: {
-            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle),
+            commands.CANNOT_FLEE: Transition.by_admin(StateBattlePlayerTurn),
+            commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
         },
-        StateBattleEnemyTurn: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattle)},
+        StateBattleEnemyTurn: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase)},
         StateItemEvent: {
+            commands.ACCEPTED: Transition.by_user(StateItemPickUp),
+            commands.REJECTED: Transition.by_user(StateItemEventFinished)
+        },
+        StateItemPickUp: {
+            commands.ITEM_PICKED_UP: Transition.by_admin(StateItemEventFinished),
+            commands.DROP_ITEM: Transition.by_user(StateItemPickUpFullInventory),
+            commands.IGNORE: Transition.by_user(StateItemPickUpIgnored)
+        },
+        StateItemPickUpFullInventory: {commands.ITEM_PICKED_UP: Transition.by_admin(StateItemEventFinished)},
+        StateItemPickUpIgnored: {commands.EVENT_FINISHED: Transition.by_admin(StateItemEventFinished)},
+        StateItemEventFinished: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateTrapEvent: {
+            commands.GO_UP: Transition.by_admin(StateGoUp),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
         },
-        StateTrapEvent: {
-            commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
+        StateElevatorEvent: {
+            commands.ACCEPTED: Transition.by_user(StateGoUp),
+            commands.REJECTED: Transition.by_user(StateElevatorOmitted)
+        },
+        StateGoUp: {commands.ENTERED_NEXT_FLOOR: Transition.by_admin(StateNextFloor)},
+        StateElevatorOmitted: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateNextFloor: {
+            commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent),
+            commands.RESTART: Transition.by_admin(StateStart)
         },
         StateCharacterEvent: {
             commands.START_ITEM_TRADE: Transition.by_admin(StateItemTrade),
@@ -112,6 +148,13 @@ class StateMachine:
     def __init__(self, game_config: dict, player_name: str):
         self._context = StateMachineContext(game_config, player_name)
         self._state = StateStart(self._context)
+        self._generic_actions_handlers = {
+            commands.HELP: self._show_available_actions,
+            commands.RESTART: self._restart_state_machine,
+            commands.SHOW_FAMILIAR_STATS: self._handle_familiar_stats_query,
+            commands.SHOW_INVENTORY: self._handle_inventory_query,
+            commands.SHOW_FLOOR: self._handle_floor_query
+        }
 
     def on_action(self, action):
         try:
@@ -123,35 +166,35 @@ class StateMachine:
 
     def _handle_generic_action(self, action: StateMachineAction) -> bool:
         command = action.command
-        if command == commands.RESTART:
-            if action.is_given_by_admin:
-                self._state = StateStart(self._context)
-            return True
-        if command == commands.SHOW_FAMILIAR_STATS:
-            self._handle_familiar_stats_query()
-            return True
-        elif command == commands.SHOW_INVENTORY:
-            self._handle_inventory_query()
-            return True
-        elif command == commands.SHOW_FLOOR:
-            self._handle_floor_query()
+        if command in self._generic_actions_handlers:
+            self._generic_actions_handlers[command](action)
             return True
         else:
             return False
 
-    def _handle_familiar_stats_query(self):
+    def _show_available_actions(self, action):
+        state_specific_commands = ', '.join(self._current_state_transition_table().keys())
+        generic_commands = ', '.join(self._generic_actions_handlers.keys())
+        self._context.add_response(f"Specific commands: {state_specific_commands}.")
+        self._context.add_response(f"Generic commands: {generic_commands}.")
+
+    def _restart_state_machine(self, action):
+        if action.is_given_by_admin:
+            self._state = StateStart(self._context)
+
+    def _handle_familiar_stats_query(self, action):
         familiar = self._context.familiar
         self._context.add_response(f"{familiar.to_string()}.")
 
-    def _handle_inventory_query(self):
+    def _handle_inventory_query(self, action):
         inventory_string = ', '.join(self._context.inventory.items)
         self._context.add_response(f"You have: {inventory_string}.")
 
-    def _handle_floor_query(self):
+    def _handle_floor_query(self, action):
         self._context.add_response(f"You are on {self._context.floor + 1}F.")
 
     def _handle_non_generic_action(self, action):
-        state_transition_table = self.TRANSITIONS.get(type(self._state))
+        state_transition_table = self._current_state_transition_table()
         if state_transition_table is None:
             self._on_unknown_state()
             return
@@ -162,6 +205,9 @@ class StateMachine:
             self._change_state(transition, action)
             if self._context.has_action():
                 self._handle_non_generic_action(self._context.take_action())
+
+    def _current_state_transition_table(self) -> dict:
+        return self.TRANSITIONS.get(type(self._state))
 
     def _on_unknown_state(self):
         logger.error(f"{self} is in state {self._state} for which there is no transition.")

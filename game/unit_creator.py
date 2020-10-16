@@ -11,6 +11,7 @@ class UnitCreator:
         self._spell = None
 
     def set_spell(self, spell: Spell):
+        # TODO: probably change it to SpellTraits
         self._spell = spell
         return self
 

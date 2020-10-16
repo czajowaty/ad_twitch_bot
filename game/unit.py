@@ -5,7 +5,7 @@ from game.spell import Spell
 from game.talents import Talents
 from game.traits import UnitTraits
 from game.stats_calculator import StatsCalculator
-
+from game.statuses import Statuses
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class Unit:
         self.attack = traits.base_attack
         self.defense = traits.base_defense
         self.luck = traits.base_luck
+        self.clear_statuses()
         if traits.native_spell_traits is not None:
             self.spell = Spell(traits.native_spell_traits)
         else:
@@ -125,7 +126,7 @@ class Unit:
 
     @property
     def attack(self):
-        return self._attack
+        return int(self._attack * self._stat_factor())
 
     @attack.setter
     def attack(self, value):
@@ -133,7 +134,7 @@ class Unit:
 
     @property
     def defense(self):
-        return self._defense
+        return int(self._defense * self._stat_factor())
 
     @defense.setter
     def defense(self, value):
@@ -141,11 +142,36 @@ class Unit:
 
     @property
     def luck(self):
-        return self._luck
+        return int(self._luck * self._stat_factor())
 
     @luck.setter
     def luck(self, value):
         self._luck = value
+
+    def _stat_factor(self) -> float:
+        STAT_BOOST_FACTOR = 0.5
+        stat_factor = 1.0
+        if self.has_boosted_stats():
+            stat_factor += STAT_BOOST_FACTOR
+        return stat_factor
+
+    def has_any_status(self) -> bool:
+        return self._statuses.value != 0
+
+    def has_status(self, status: Statuses) -> bool:
+        return (self._statuses & status) == status
+
+    def has_boosted_stats(self) -> bool:
+        return self.has_status(Statuses.StatsBoost)
+
+    def set_status(self, status: Statuses):
+        self._statuses |= status
+
+    def clear_statuses(self):
+        self._statuses = Statuses(0)
+
+    def clear_status(self, status: Statuses):
+        self._statuses &= ~status
 
     @property
     def spell(self) -> Spell:
@@ -189,6 +215,9 @@ class Unit:
         return self._levels.experience_for_next_level(self.level)
 
     def _level_up(self):
+        are_stats_boosted = self.has_boosted_stats()
+        if are_stats_boosted:
+            self.clear_status(Statuses.StatsBoost)
         self.level += 1
         self._increase_hp_on_level_up()
         self._increase_mp_on_level_up()
@@ -196,6 +225,8 @@ class Unit:
         self._increase_defense_on_level_up()
         self._increase_luck_on_level_up()
         self._increase_spell_level_on_level_up()
+        if are_stats_boosted:
+            self.set_status(Statuses.StatsBoost)
 
     def _increase_hp_on_level_up(self):
         hp_increase = self._stats_calculator().hp_increase(self.level)
@@ -249,6 +280,8 @@ class Unit:
         s = f'genus: {self._genus_to_string()}, talents: {self._talents_to_string()}, LVL: {self.level}, ' \
             f'HP: {self.hp}/{self.max_hp}, MP: {self.mp}/{self.max_mp}, ' \
             f'ATK: {self.attack}, DEF: {self.defense}, LUCK: {self.luck}'
+        if self.has_any_status():
+            s += f', statuses: {self._statuses_to_string()}'
         if self.has_spell():
             s += f', spell: LVL {self.spell.level} {self.spell.traits.name} (MP cost: {self.spell_mp_cost})'
         s += f', EXP: {self.exp}'
@@ -267,3 +300,6 @@ class Unit:
             return '-'
         else:
             return ', '.join(talent.name for talent in Talents.all() if self.talents.has(talent))
+
+    def _statuses_to_string(self) -> str:
+        return ', '.join(status.name for status in Statuses if self.has_status(status))

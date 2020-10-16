@@ -1,9 +1,11 @@
 from game import commands
 from game.damage_calculator import DamageCalculator
+from game.items import Item
 from game.state_base import StateBase
-from game.state_machine_context import StateMachineContext
+from game.state_with_inventory_item import StateWithInventoryItem
 from game.stats_calculator import StatsCalculator
 from game.state_machine_context import BattleContext
+from game.statuses import Statuses
 from game.unit import Unit
 
 DamageRoll = DamageCalculator.DamageRoll
@@ -16,7 +18,13 @@ class StateBattleEvent(StateBase):
         self._context.generate_action(commands.START_BATTLE, monster)
 
 
-class StateStartBattle(StateBase):
+class StateBattleBase(StateBase):
+    @property
+    def _battle_context(self) -> BattleContext:
+        return self._context.battle_context
+
+
+class StateStartBattle(StateBattleBase):
     def __init__(self, context, enemy: Unit):
         super().__init__(context)
         self._enemy = enemy
@@ -26,14 +34,47 @@ class StateStartBattle(StateBase):
         self._context.add_response(
             f"You encountered LVL {enemy.level} {enemy.name} ({enemy.hp} HP).")
         self._context.start_battle(self._enemy)
-        self._context.generate_action(commands.BATTLE_STARTED)
+        self._battle_context.start_prepare_phase(counter=3)
+        self._context.generate_action(commands.BATTLE_PREPARE_PHASE, (True,))
+
+    @classmethod
+    def _parse_args(cls, context, args):
+        return args[0],
 
 
-class StateBattleBase(StateBase):
-    @property
-    def _battle_context(self) -> BattleContext:
-        return self._context.battle_context
+class StateBattlePreparePhase(StateBattleBase):
+    def __init__(self, context, prepare_phase_turn_used: bool):
+        super().__init__(context)
+        self._prepare_phase_turn_used = prepare_phase_turn_used
 
+    def on_enter(self):
+        if self._context.familiar.has_status(Statuses.Sleep):
+            self._context.add_response(
+                "You are very sleepy and before you even noticed enemy approached you. Time to battle!")
+            self._battle_context.finish_prepare_phase()
+        else:
+            if self._prepare_phase_turn_used:
+                self._battle_context.dec_prepare_phase_counter()
+            if not self._battle_context.is_prepare_phase():
+                self._context.add_response("Enemy approached you. Time to battle!")
+            elif self._prepare_phase_turn_used:
+                self._context.add_response("Enemy is close, but you still have time to prepare.")
+        if not self._battle_context.is_prepare_phase():
+            self._context.generate_action(commands.BATTLE_PREPARE_PHASE_FINISHED)
+
+    @classmethod
+    def _parse_args(cls, context, args):
+        return args[0],
+
+
+class StateBattleApproach(StateBattleBase):
+    def on_enter(self):
+        self._battle_context.finish_prepare_phase()
+        self._context.add_response("Time to battle!")
+        self._context.generate_action(commands.BATTLE_PREPARE_PHASE_FINISHED)
+
+
+class StateBattlePhaseBase(StateBattleBase):
     def _is_enemy_dead(self) -> bool:
         return self._battle_context.enemy.is_dead()
 
@@ -48,7 +89,7 @@ class StateBattleBase(StateBase):
             return self._physical_attack_miss_response(attacker, defender)
         else:
             damage_calculator = DamageCalculator(attacker, defender)
-            relative_height = self._select_relative_height(attacker)
+            relative_height = self._select_relative_height(attacker, defender)
             is_critical = self._select_whether_attack_is_critical(attacker)
             damage = damage_calculator.physical_damage(self._select_damage_roll(), relative_height, is_critical)
             defender.deal_damage(damage)
@@ -65,15 +106,32 @@ class StateBattleBase(StateBase):
         if attacker.luck <= 0:
             return False
         else:
-            hit_chance = attacker.luck - 1 / attacker.luck
+            hit_chance = (attacker.luck - 1) / attacker.luck
+            if attacker.has_status(Statuses.Blind):
+                hit_chance /= 2
             return self._context.does_action_succeed(success_chance=hit_chance)
 
     def _select_damage_roll(self) -> DamageRoll:
         return self._context.rng.choices([DamageRoll.Low, DamageRoll.Normal, DamageRoll.High], weights=[1, 2, 1])[0]
 
-    def _select_relative_height(self, attacker: Unit) -> RelativeHeight:
-        # TODO: Check from attacker status
-        return DamageCalculator.RelativeHeight.Same
+    def _select_relative_height(self, attacker: Unit, defender: Unit) -> RelativeHeight:
+        def unit_height(unit: Unit):
+            unit_height = 0
+            if unit.has_status(Statuses.Crack):
+                unit_height -= 1
+            if unit.has_status(Statuses.Upheavel):
+                unit_height += 1
+            return unit_height
+
+        attacker_height = unit_height(attacker)
+        defender_height = unit_height(defender)
+        relative_height = attacker_height - defender_height
+        if relative_height > 0:
+            return RelativeHeight.Higher
+        elif relative_height < 0:
+            return RelativeHeight.Lower
+        else:
+            return RelativeHeight.Same
 
     def _select_whether_attack_is_critical(self, attacker: Unit) -> bool:
         crit_chance = (attacker.luck // 64 + 1) / 128
@@ -140,9 +198,10 @@ class StateBattleBase(StateBase):
         return response
 
 
-class StateBattle(StateBattleBase):
+class StateBattlePhase(StateBattlePhaseBase):
     def on_enter(self):
         if self._is_battle_finished():
+            self._clear_statuses()
             if self._is_enemy_dead():
                 self._handle_enemy_defeated()
             self._context.finish_battle()
@@ -153,10 +212,16 @@ class StateBattle(StateBattleBase):
                 self._context.generate_action(commands.EVENT_FINISHED)
         else:
             self._select_next_one_to_act()
+            self._handle_counters()
             if self._battle_context.is_player_turn:
                 self._context.generate_action(commands.PLAYER_TURN)
             else:
                 self._context.generate_action(commands.ENEMY_TURN)
+
+    def _clear_statuses(self):
+        # TODO: Maybe add some responses about cleared statuses
+        familiar = self._context.familiar
+        familiar.clear_statuses()
 
     def _handle_enemy_defeated(self):
         enemy = self._battle_context.enemy
@@ -179,16 +244,24 @@ class StateBattle(StateBattleBase):
             given_experience *= 2
         return given_experience
 
+    def _handle_counters(self):
+        if not self._battle_context.is_holy_scroll_active():
+            return
+        if self._battle_context.is_player_turn:
+            self._battle_context.dec_holy_scroll_counter()
+        if not self._battle_context.is_holy_scroll_active():
+            self._context.add_response("Holy scroll's beams dissipate.")
+
     def _select_next_one_to_act(self):
         self._battle_context.is_player_turn = not self._battle_context.is_player_turn
 
 
-class StateBattlePlayerTurn(StateBattleBase):
+class StateBattlePlayerTurn(StateBattlePhaseBase):
     def on_enter(self):
         self._context.add_response(f"Your turn.")
 
 
-class StateBattleAttack(StateBattleBase):
+class StateBattleAttack(StateBattlePhaseBase):
     def on_enter(self):
         familiar = self._context.familiar
         enemy = self._battle_context.enemy
@@ -197,7 +270,7 @@ class StateBattleAttack(StateBattleBase):
         self._context.generate_action(commands.BATTLE_ACTION_PERFORMED)
 
 
-class StateBattleUseSpell(StateBattleBase):
+class StateBattleUseSpell(StateBattlePhaseBase):
     def on_enter(self):
         familiar = self._context.familiar
         if not familiar.has_spell():
@@ -220,36 +293,42 @@ class StateBattleUseSpell(StateBattleBase):
             raise cls.PreConditionsNotMet('You do not have enough MP.')
 
 
-class StateBattleUseItem(StateBattleBase):
-    def __init__(self, context: StateMachineContext, item_index: int):
-        super().__init__(context)
-        self._item_index = item_index
+class StateBattleUseItem(StateWithInventoryItem):
+    @property
+    def _battle_context(self) -> BattleContext:
+        return self._context.battle_context
 
     def on_enter(self):
         item = self._context.inventory.peek_item(self._item_index)
         can_use, reason = item.can_use(self._context)
         if not can_use:
-            self._context.add_response(f"You cannot use {item.name}. {reason}")
-            self._context.generate_action(commands.CANNOT_USE_ITEM)
+            command, args = self._handle_cannot_use_item(item, reason)
         else:
-            item.use(self._context)
-            self._context.inventory.take_item(self._item_index)
-            self._context.generate_action(commands.BATTLE_ACTION_PERFORMED)
+            command, args = self._handle_can_use_item(item)
+        self._context.generate_action(command, *args)
 
-    @classmethod
-    def _parse_args(cls, context: StateMachineContext, args):
-        if len(args) < 1:
-            raise cls.ArgsParseError('You need to specify item to use.')
-        item_name = ''.join(args)
-        try:
-            index, _ = context.inventory.find_item(item_name)
-        except ValueError:
-            raise cls.ArgsParseError(f'You do not have "{item_name}" in your inventory.')
-        return (index,)
+    def _handle_cannot_use_item(self, item: Item, reason: str):
+        self._context.add_response(f"You cannot use {item.name}. {reason}")
+        if self._battle_context.is_prepare_phase():
+            return commands.CANNOT_USE_ITEM_PREPARE_PHASE, (False, )
+        else:
+            return commands.CANNOT_USE_ITEM_BATTLE_PHASE, ()
+
+    def _handle_can_use_item(self, item: Item):
+        item.use(self._context)
+        self._context.inventory.take_item(self._item_index)
+        if self._battle_context.is_prepare_phase():
+            return commands.BATTLE_PREPARE_PHASE_ACTION_PERFORMED, (True, )
+        else:
+            return commands.BATTLE_ACTION_PERFORMED, ()
 
 
-class StateBattleTryToFlee(StateBattleBase):
+class StateBattleTryToFlee(StateBattlePhaseBase):
     def on_enter(self):
+        if self._context.familiar.has_status(Statuses.Paralyze):
+            self._context.add_response("You are paralyzed and cannot flee.")
+            self._context.generate_action(commands.CANNOT_FLEE)
+            return
         if self._context.does_action_succeed(success_chance=self.game_config.probabilities.flee):
             self._battle_context.finish_battle()
             self._context.add_response("You successfully fleed from the battle.")
@@ -258,10 +337,14 @@ class StateBattleTryToFlee(StateBattleBase):
         self._context.generate_action(commands.BATTLE_ACTION_PERFORMED)
 
 
-class StateBattleEnemyTurn(StateBattleBase):
+class StateBattleEnemyTurn(StateBattlePhaseBase):
     def on_enter(self):
-        familiar = self._context.familiar
         enemy = self._battle_context.enemy
-        response = self._perform_physical_attack(attacker=enemy, defender=familiar)
-        self._context.add_response(response)
+        if self._battle_context.is_holy_scroll_active():
+            self._context.add_response(f"Field is engulfed in holy scroll's beams. {enemy.name} cannot act.")
+        else:
+            familiar = self._context.familiar
+            enemy = self._battle_context.enemy
+            response = self._perform_physical_attack(attacker=enemy, defender=familiar)
+            self._context.add_response(response)
         self._context.generate_action(commands.BATTLE_ACTION_PERFORMED)

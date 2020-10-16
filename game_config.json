@@ -1,6 +1,43 @@
 {
     "probabilities": {
-        "flee": 0.9
+        "flee": 0.2
+    },
+    "items_weights": {
+        "Pita": 1,
+        "Oleem": 1,
+        "Holy Scroll": 1,
+        "Medicinal Herb": 1,
+        "Cure-All Herb": 1,
+        "Fire Ball": 1,
+        "Water Ball": 1
+    },
+    "characters_events_weights": {
+        "Cherrl": 1,
+        "Nico": 1,
+        "Patty": 1,
+        "Fur": 1,
+        "Selfi": 1,
+        "Mia": 1,
+        "Vivianne": 1,
+        "Ghosh": 1,
+        "Beldo": 1
+    },
+    "traps_weights": {
+        "Poison": 1,
+        "Sleep": 1,
+        "Upheaval": 1,
+        "Crack": 1,
+        "Go up": 1,
+        "Paralyze": 1,
+        "Blinder": 1
+    },
+    "events_weights": {
+        "battle": 1,
+        "character": 1,
+        "elevator": 1,
+        "item": 1,
+        "trap": 1,
+        "tame familiar": 1
     },
     "experience_per_level": [
         0,

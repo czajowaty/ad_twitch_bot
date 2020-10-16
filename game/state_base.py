@@ -43,7 +43,7 @@ class StateBase:
 
     @classmethod
     def _parse_args(cls, context, args):
-        return args
+        return ()
 
     @classmethod
     def _verify_preconditions(cls, context, parsed_args):

@@ -1,9 +1,9 @@
 from game.errors import InvalidOperation
-from game.items import Item
+from game.items import normalize_item_name, Item
 
 
 class Inventory:
-    def __init__(self, capacity=20):
+    def __init__(self, capacity=5):
         self._capacity = capacity
         self._items: list[Item] = []
 
@@ -30,8 +30,11 @@ class Inventory:
         self._items.append(item)
 
     def find_item(self, name) -> (int, Item):
+        searched_item_name = normalize_item_name(name)
+        if len(searched_item_name) == 0:
+            raise ValueError()
         for index, item in enumerate(self._items):
-            if item.name.replace(' ', '').lower().startswith(name.replace(' ', '').lower()):
+            if normalize_item_name(item.name).startswith(searched_item_name):
                 return index, item
         raise ValueError()
 

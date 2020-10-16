@@ -1,4 +1,4 @@
-from .traits import SpellTraits
+from game.traits import SpellTraits
 
 
 class Spell:

@@ -1,11 +1,16 @@
 from game import commands, items
-from game.items import Item
 from game.state_base import StateBase
 from game.unit import Unit
 from game.unit_creator import UnitCreator
+from game.state_with_inventory_item import StateWithInventoryItem
+from game.statuses import Statuses
 
 
 class StateCharacterEvent(StateBase):
+    def __init__(self, context, character=None):
+        super().__init__(context)
+        self._character = character
+
     def on_enter(self):
         character = self._select_character()
         encounter_handler = self.ENCOUNTERS[character]
@@ -14,7 +19,7 @@ class StateCharacterEvent(StateBase):
         self._context.generate_action(next_command, *args)
 
     def _select_character(self):
-        return self._context.rng.choice(list(self.ENCOUNTERS.keys()))
+        return self._character or self._context.rng.choice(list(self.ENCOUNTERS.keys()))
 
     def _handle_cherrl_encounter(self):
         familiar = self._context.familiar
@@ -26,7 +31,10 @@ class StateCharacterEvent(StateBase):
         return (commands.EVENT_FINISHED, ()), 'You are cultured. You gain 100 channel points.'
 
     def _handle_patty_encounter(self):
-        return (commands.EVENT_FINISHED, ()), 'Your familiar stats are boosted.'
+        self._context.familiar.set_status(Statuses.StatsBoost)
+        return (commands.EVENT_FINISHED, ()), \
+            'You immediately catch the scent of amazing curry that she carries. ' \
+            'You gobble it without hesitation. You feel much stronger and sooo ready for the next battle.'
 
     def _handle_fur_encounter(self):
         if self.inventory.is_empty():
@@ -35,7 +43,8 @@ class StateCharacterEvent(StateBase):
                 'She finds you very uninteresting and leaves with a grumpy face.'
         else:
             item = self._context.rng.choice(items.all_items())
-            return (commands.START_ITEM_TRADE, (item,)), 'She offers you an item exchange.'
+            self._context.buffer_item(item)
+            return (commands.START_ITEM_TRADE, ()), 'She offers you an item exchange.'
 
     def _handle_selfi_encounter(self):
         familiar_for_trade_traits = self._context.familiar.traits
@@ -60,7 +69,8 @@ class StateCharacterEvent(StateBase):
         floor = min(self._context.floor + 1, self.game_config.highest_floor)
         monster = self._context.generate_monster(floor, level_increase=1)
         return (commands.START_BATTLE, (monster,)), \
-            'He is accompanied by a strong monster, which takes its interest in you...'
+            'He is accompanied by a strong monster, which takes its interest in you... ' \
+            'Beldo leaves laughing maniacally.'
 
     ENCOUNTERS = {
         'Cherrl': _handle_cherrl_encounter,
@@ -74,41 +84,31 @@ class StateCharacterEvent(StateBase):
         'Beldo': _handle_beldo_encounter
     }
 
+    @classmethod
+    def _parse_args(cls, context, args):
+        if len(args) == 0:
+            return ()
+        character = args[0].lower().capitalize()
+        if character not in cls.ENCOUNTERS.keys():
+            raise cls.ArgsParseError('Unknown character')
+        return character,
+
 
 class StateItemTrade(StateBase):
-    def __init__(self, context, item: Item):
-        super().__init__(context)
-        self._item = item
-
     def on_enter(self):
         inventory_string = ', '.join(self._context.inventory.items)
-        self._context.set_item_for_trade(self._item)
-        self._context.add_response(f"You have: {inventory_string}. Fur offers {self._item.name}. Do you want to trade?")
+        item = self._context.peek_buffered_item()
+        self._context.add_response(f"You have: {inventory_string}. Fur offers {item.name}. Do you want to trade?")
 
 
-class StateItemTradeAccepted(StateBase):
-    def __init__(self, context, item_index: int):
-        super().__init__(context)
-        self._item_index = item_index
-
+class StateItemTradeAccepted(StateWithInventoryItem):
     def on_enter(self):
         self._context.inventory.take_item(self._item_index)
-        self._context.inventory.add_item(self._context.take_item_for_trade())
+        self._context.inventory.add_item(self._context.take_buffered_item())
         self._context.add_response(
             "Fur is very happy with what she got. She leaves with a smug smile on her face. "
             "Maybe you made a mistake...")
         self._context.generate_action(commands.EVENT_FINISHED)
-
-    @classmethod
-    def _parse_args(cls, context, args):
-        if len(args) < 1:
-            raise cls.ArgsParseError('You need to specify item to use.')
-        item_name = ''.join(args)
-        try:
-            index, _ = context.inventory.find_item(item_name)
-        except ValueError:
-            raise cls.ArgsParseError(f'You do not have "{item_name}" in your inventory.')
-        return (index,)
 
 
 class StateItemTradeRejected(StateBase):

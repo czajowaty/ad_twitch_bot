@@ -1,10 +1,16 @@
 from game.errors import InvalidOperation
 
 
+def normalize_item_name(*item_name_parts: str):
+    item_name = ''.join(item_name_parts)
+    return item_name.replace(' ', '').lower()
+
+
 class Item:
+    @classmethod
     @property
-    def name(self) -> str:
-        raise NotImplementedError(f'{self.__class__.__name__}.name')
+    def name(cls) -> str:
+        raise NotImplementedError(f'{cls.__name__}.name')
 
     def can_use(self, context) -> bool:
         raise NotImplementedError(f'{self.__class__.__name__}.{self.can_use}')
@@ -21,8 +27,9 @@ class Item:
 
 
 class Pita(Item):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Pita'
 
     def can_use(self, context) -> (bool, str):
@@ -36,17 +43,20 @@ class Pita(Item):
         return 'Your MP has been restored to max.'
 
 
-class BattleOnlyItem(Item):
+class BattlePhaseOnlyItem(Item):
     def can_use(self, context) -> bool:
         if not context.is_in_battle():
             return False, 'You are not in battle.'
+        elif context.battle_context.is_prepare_phase():
+            return False, 'Battle has not started yet.'
         else:
             return True, ''
 
 
-class Oleem(BattleOnlyItem):
+class Oleem(BattlePhaseOnlyItem):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Oleem'
 
     def _use(self, context) -> bool:
@@ -54,19 +64,21 @@ class Oleem(BattleOnlyItem):
         return 'Monster disappeared.'
 
 
-class HolyScroll(BattleOnlyItem):
+class HolyScroll(BattlePhaseOnlyItem):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Holy Scroll'
 
     def _use(self, context) -> str:
-        # TODO: Implement adding the status
+        context.battle_context.set_holy_scroll_counter(3)
         return 'You are invulnerable for next 3 turns.'
 
 
 class MedicinalHerb(Item):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Medicinal Herb'
 
     def can_use(self, context) -> bool:
@@ -81,24 +93,26 @@ class MedicinalHerb(Item):
 
 
 class CureAllHerb(Item):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Cure-All Herb'
 
     def can_use(self, context) -> bool:
-        if True:  # TODO: Check if unit has negative status
-            return False, 'You do not have any negative statuses.'
+        if not context.familiar.has_any_status():
+            return False, 'You do not have any statuses.'
         else:
             return True, ''
 
     def _use(self, context) -> str:
-        # TODO: heal negative statuses
-        return 'You no longer have any negative statuses.'
+        context.familiar.clear_statuses()
+        return 'You no longer have any statuses.'
 
 
-class FireBall(BattleOnlyItem):
+class FireBall(BattlePhaseOnlyItem):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Fire Ball'
 
     def _use(self, context) -> str:
@@ -109,8 +123,9 @@ class FireBall(BattleOnlyItem):
 
 
 class WaterBall(Item):
+    @classmethod
     @property
-    def name(self) -> str:
+    def name(cls) -> str:
         return 'Water Ball'
 
     def can_use(self, context) -> bool:
