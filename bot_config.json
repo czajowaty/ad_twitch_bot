@@ -1,7 +1,7 @@
 {
-    "OATH_TOKEN": "oauth:g7ts5qzdtgjoyn8djp5gzd1y08ecvi",
-    "CLIENT_ID": "ltm3ytckm3l0km3kghehttsiwduo42",
-    "NICK": "czaj_",
+    "OATH_TOKEN": "oauth:",
+    "CLIENT_ID": "",
+    "NICK": "",
     "PREFIX": "!",
-    "CHANNEL": "#czaj_"
+    "CHANNEL": "#"
 }
