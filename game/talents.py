@@ -12,11 +12,13 @@ class Talents(enum.Flag):
     MagicAttackIncreased = 0x80
     MpConsumptionDecreased = 0x100
     ElectricShock = 0x8000
-    DoesNotSurviveFusion = 0x400000
-    SurvivesFusion = 0x800000
+    Atrocious = 0x200000
 
     def has(self, talents: '__class__') -> bool:
         return (self & talents) == talents
+
+    def clear(self, talents: '__class__'):
+        self = self & (~talents)
 
     @classmethod
     def all(cls) -> list['__class__']:

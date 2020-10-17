@@ -6,6 +6,7 @@ from game.state_with_inventory_item import StateWithInventoryItem
 from game.stats_calculator import StatsCalculator
 from game.state_machine_context import BattleContext
 from game.statuses import Statuses
+from game.talents import Talents
 from game.unit import Unit
 
 DamageRoll = DamageCalculator.DamageRoll
@@ -31,8 +32,8 @@ class StateStartBattle(StateBattleBase):
 
     def on_enter(self):
         enemy = self._enemy
-        self._context.add_response(
-            f"You encountered LVL {enemy.level} {enemy.name} ({enemy.hp} HP).")
+        self._context.add_response(f"You encountered LVL {enemy.level} {enemy.name} ({enemy.hp} HP).")
+        self._context.add_response(f"{enemy.to_string()}.")
         self._context.start_battle(self._enemy)
         self._battle_context.start_prepare_phase(counter=3)
         self._context.generate_action(commands.BATTLE_PREPARE_PHASE, (True,))
@@ -134,7 +135,8 @@ class StateBattlePhaseBase(StateBattleBase):
             return RelativeHeight.Same
 
     def _select_whether_attack_is_critical(self, attacker: Unit) -> bool:
-        crit_chance = (attacker.luck // 64 + 1) / 128
+        divider = 2 if attacker.talents.has(Talents.Atrocious) else 64
+        crit_chance = (attacker.luck // divider + 1) / 128
         return self._context.does_action_succeed(success_chance=crit_chance)
 
     def _physical_attack_miss_response(self, attacker: Unit, defender: Unit):
@@ -211,8 +213,8 @@ class StateBattlePhase(StateBattlePhaseBase):
             else:
                 self._context.generate_action(commands.EVENT_FINISHED)
         else:
-            self._select_next_one_to_act()
-            self._handle_counters()
+            next_one_to_act_changed = self._select_next_one_to_act()
+            self._handle_counters(next_one_to_act_changed)
             if self._battle_context.is_player_turn:
                 self._context.generate_action(commands.PLAYER_TURN)
             else:
@@ -244,16 +246,37 @@ class StateBattlePhase(StateBattlePhaseBase):
             given_experience *= 2
         return given_experience
 
-    def _handle_counters(self):
+    def _select_next_one_to_act(self):
+        if self._battle_context.is_first_turn:
+            self._battle_context.is_first_turn = False
+            return False
+        if self._battle_context.is_player_turn:
+            attacker = self._context.familiar
+            defender = self._battle_context.enemy
+        else:
+            attacker = self._battle_context.enemy
+            defender = self._context.familiar
+        if attacker.talents.has(Talents.Quick) and not defender.talents.has(Talents.Quick):
+            max_turn_counter = 2
+        else:
+            max_turn_counter = 1
+        self._battle_context.inc_turn_counter()
+        if self._battle_context.turn_counter >= max_turn_counter:
+            self._battle_context.is_player_turn = not self._battle_context.is_player_turn
+            self._battle_context.clear_turn_counter()
+            return True
+        else:
+            return False
+
+    def _handle_counters(self, next_one_to_act_changed):
+        if not next_one_to_act_changed:
+            return
         if not self._battle_context.is_holy_scroll_active():
             return
         if self._battle_context.is_player_turn:
             self._battle_context.dec_holy_scroll_counter()
         if not self._battle_context.is_holy_scroll_active():
             self._context.add_response("Holy scroll's beams dissipate.")
-
-    def _select_next_one_to_act(self):
-        self._battle_context.is_player_turn = not self._battle_context.is_player_turn
 
 
 class StateBattlePlayerTurn(StateBattlePhaseBase):

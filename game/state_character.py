@@ -1,6 +1,5 @@
 from game import commands, items
 from game.state_base import StateBase
-from game.unit import Unit
 from game.unit_creator import UnitCreator
 from game.state_with_inventory_item import StateWithInventoryItem
 from game.statuses import Statuses
@@ -19,7 +18,12 @@ class StateCharacterEvent(StateBase):
         self._context.generate_action(next_command, *args)
 
     def _select_character(self):
-        return self._character or self._context.rng.choice(list(self.ENCOUNTERS.keys()))
+        return self._character or self._context.random_selection_with_weights(self._character_events_weights())
+
+    def _character_events_weights(self):
+        character_events_weights = dict(self.game_config.character_events_weights)
+        if not self._context.familiar.does_evolve():
+            del character_events_weights['Mia']
 
     def _handle_cherrl_encounter(self):
         familiar = self._context.familiar
@@ -52,13 +56,16 @@ class StateCharacterEvent(StateBase):
             familiar_for_trade_traits = self._context.rng.choice(list(self.game_config.monsters_traits.values()))
         familiar_for_trade = UnitCreator(familiar_for_trade_traits).create(self._context.familiar.level)
         familiar_for_trade.exp = self._context.familiar.exp
-        return (commands.START_FAMILIAR_TRADE, (familiar_for_trade,)), 'She offers you a familiar trade.'
+        self._context.buffer_unit(familiar_for_trade)
+        return (commands.START_FAMILIAR_TRADE, ()), 'She offers you a familiar trade.'
 
     def _handle_mia_encounter(self):
-        return (commands.EVENT_FINISHED, ()), 'She gazes upon you while mumbling indefinitely. You leave her alone...'
+        return (commands.EVOLVE_FAMILIAR, ()), \
+            'She gazes upon you while mumbling indefinitely. ' \
+            'Suddenly she throws mysterious potion at your familiar and something weird is happening to it...'
 
     def _handle_vivianne_encounter(self):
-        return (commands.EVENT_FINISHED, ()), 'She started dancing. After a while you leave.'
+        return (commands.EVENT_FINISHED, ()), 'She started dancing. After watching for a while you leave.'
 
     def _handle_ghosh_encounter(self):
         ghosh_traits = self.game_config.special_units_traits.ghosh
@@ -118,21 +125,17 @@ class StateItemTradeRejected(StateBase):
 
 
 class StateFamiliarTrade(StateBase):
-    def __init__(self, context, familiar_for_trade: Unit):
-        super().__init__(context)
-        self._familiar_for_trade = familiar_for_trade
-
     def on_enter(self):
-        self._context.set_familiar_for_trade(self._familiar_for_trade)
+        familiar_for_trade = self._context.peek_buffered_unit()
         familiar = self._context.familiar
         self._context.add_response(
-            f"You have: {familiar.to_string()}. Selfi offers {self._familiar_for_trade.to_string()}. "
+            f"You have: {familiar.to_string()}. Selfi offers {familiar_for_trade.to_string()}. "
             "Do you want to trade?")
 
 
 class StateFamiliarTradeAccepted(StateBase):
     def on_enter(self):
-        self._context.familiar = self._context.take_familiar_for_trade()
+        self._context.familiar = self._context.take_buffered_unit()
         self._context.add_response(
             "Selfi hapilly says \"Thank you, Puffy Lips!\" and quickly walks away with your familiar.")
         self._context.generate_action(commands.EVENT_FINISHED)
@@ -140,6 +143,16 @@ class StateFamiliarTradeAccepted(StateBase):
 
 class StateFamiliarTradeRejected(StateBase):
     def on_enter(self):
+        self._context.clear_unit_buffer()
         self._context.add_response(
             "Selfi turns around and leaves immediately. From afar you can hear her saying \"Stupid, Puffy Lips...\".")
+        self._context.generate_action(commands.EVENT_FINISHED)
+
+
+class StateEvolveFamiliar(StateBase):
+    def on_enter(self):
+        familiar = self._context.familiar
+        evolved_monster_traits = self.game_config.monsters_traits[familiar.traits.evolves_into]
+        familiar.evolve(evolved_monster_traits)
+        self._context.add_response(f"Your familiar evolved into {familiar.name}!")
         self._context.generate_action(commands.EVENT_FINISHED)

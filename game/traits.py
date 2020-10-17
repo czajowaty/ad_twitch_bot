@@ -1,3 +1,4 @@
+import copy
 from game.genus import Genus
 from game.talents import Talents
 
@@ -21,6 +22,13 @@ class UnitTraits:
         self.native_spell_traits = None
         self.talents = Talents.Empty
         self.is_evolved = False
+        self.evolves_into = None
+
+    def does_evolve(self) -> bool:
+        return self.evolves_into is not None
+
+    def copy(self) -> '__class__':
+        return copy.deepcopy(self)
 
 
 class SpellTraits:

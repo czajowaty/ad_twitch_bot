@@ -4,6 +4,8 @@ from game.errors import InvalidOperation
 from game.inventory import Inventory
 from game.unit import Unit
 from game.state_machine_action import StateMachineAction
+from game.talents import Talents
+from game.traits import UnitTraits
 from game.unit_creator import UnitCreator
 from game.items import Item
 
@@ -13,7 +15,9 @@ class BattleContext:
         self._enemy = enemy
         self._prepare_phase_counter = 0
         self._holy_scroll_counter = 0
-        self.is_player_turn = False
+        self.is_first_turn = True
+        self.is_player_turn = True
+        self.clear_turn_counter()
         self._finished = False
 
     @property
@@ -41,6 +45,16 @@ class BattleContext:
     def set_holy_scroll_counter(self, counter):
         self._holy_scroll_counter = counter
 
+    @property
+    def turn_counter(self):
+        return self._turn_counter
+
+    def inc_turn_counter(self):
+        self._turn_counter += 1
+
+    def clear_turn_counter(self):
+        self._turn_counter = 0
+
     def is_finished(self):
         return self._finished
 
@@ -58,7 +72,7 @@ class StateMachineContext:
         self._inventory = Inventory()
         self._battle_context = None
         self._item_buffer = None
-        self._familiar_for_trade = None
+        self._unit_buffer = None
         self._rng = random.Random()
         self._responses = []
         self._generated_action = None
@@ -111,16 +125,19 @@ class StateMachineContext:
         self.clear_item_buffer()
         return item
 
-    def clear_familiar_for_trade(self):
-        self._familiar_for_trade = None
+    def clear_unit_buffer(self):
+        self._unit_buffer = None
 
-    def set_familiar_for_trade(self, familiar_for_trade: Unit):
-        self._familiar_for_trade = familiar_for_trade
+    def buffer_unit(self, unit: Unit):
+        self._unit_buffer = unit
 
-    def take_familiar_for_trade(self) -> Unit:
-        familiar_for_trade = self._familiar_for_trade
-        self.clear_familiar_for_trade()
-        return familiar_for_trade
+    def peek_buffered_unit(self) -> Unit:
+        return self._unit_buffer
+
+    def take_buffered_unit(self) -> Unit:
+        unit = self.peek_buffered_unit()
+        self.clear_unit_buffer()
+        return unit
 
     @property
     def rng(self):
@@ -150,10 +167,18 @@ class StateMachineContext:
         if floor > highest_floor:
             raise InvalidOperation(f'Highest floor is {highest_floor}')
         floor_descriptor = self.game_config.floors[floor]
-        monster_descriptor = self.rng.choices(floor_descriptor.monsters, floor_descriptor.weights)[0]
-        monster_traits = self.game_config.monsters_traits[monster_descriptor.name]
+        monster_descriptor = self.random_selection_with_weights(
+            dict(zip(floor_descriptor.monsters, floor_descriptor.weights)))
+        monster_traits = self.game_config.monsters_traits[monster_descriptor.name].copy()
+        self._remove_enemy_forbidden_talents(monster_traits)
         monster_level = min(monster_descriptor.level + level_increase, self.game_config.levels.max_level)
         return UnitCreator(monster_traits).create(monster_level)
+
+    def random_selection_with_weights(self, element_weight_dictionary: dict):
+        return self.rng.choices(list(element_weight_dictionary.keys()), list(element_weight_dictionary.values()))[0]
+
+    def _remove_enemy_forbidden_talents(self, enemy_traits: UnitTraits):
+        enemy_traits.talents &= ~(Talents.StrengthIncreased | Talents.Hard)
 
     def generate_action(self, command, *args):
         if self._generated_action is not None:

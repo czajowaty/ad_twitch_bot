@@ -1,8 +1,16 @@
 {
     "probabilities": {
-        "flee": 0.2
+        "flee": 0.65
     },
-    "items_weights": {
+    "events_weights": {
+        "battle": 1,
+        "character": 1,
+        "elevator": 1,
+        "item": 1,
+        "trap": 1,
+        "familiar": 1
+    },
+    "found_items_weights": {
         "Pita": 1,
         "Oleem": 1,
         "Holy Scroll": 1,
@@ -30,14 +38,6 @@
         "Go up": 1,
         "Paralyze": 1,
         "Blinder": 1
-    },
-    "events_weights": {
-        "battle": 1,
-        "character": 1,
-        "elevator": 1,
-        "item": 1,
-        "trap": 1,
-        "tame familiar": 1
     },
     "experience_per_level": [
         0,
@@ -156,8 +156,7 @@
             "luck_growth": 0,
             "mp_growth": 4,
             "hp_growth": 17,
-            "exp_growth": 30,
-            "talents": "DoesNotSurviveFusion"
+            "exp_growth": 30
         },
         {
             "name": "Kewne",
@@ -174,8 +173,7 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 18,
-            "exp_growth": 16,
-            "talents": "SurvivesFusion"
+            "exp_growth": 16
         },
         {
             "name": "Dragon",
@@ -192,7 +190,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 18,
-            "exp_growth": 22
+            "exp_growth": 22,
+            "is_evolved": true
         },
         {
             "name": "Kid",
@@ -210,7 +209,7 @@
             "mp_growth": 8,
             "hp_growth": 18,
             "exp_growth": 19,
-            "evolvesInto": "Dragon"
+            "evolves_into": "Dragon"
         },
         {
             "name": "Ifrit",
@@ -227,7 +226,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 19,
-            "exp_growth": 21
+            "exp_growth": 21,
+            "is_evolved": true
         },
         {
             "name": "Flame",
@@ -245,7 +245,7 @@
             "mp_growth": 0,
             "hp_growth": 18,
             "exp_growth": 15,
-            "evolvesInto": "Ifrit"
+            "evolves_into": "Ifrit"
         },
         {
             "name": "Grineut",
@@ -262,7 +262,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 20,
-            "exp_growth": 18
+            "exp_growth": 18,
+            "is_evolved": true
         },
         {
             "name": "Griffon",
@@ -280,7 +281,7 @@
             "mp_growth": 0,
             "hp_growth": 20,
             "exp_growth": 16,
-            "evolvesInto": "Grineut"
+            "evolves_into": "Grineut"
         },
         {
             "name": "Saber",
@@ -296,7 +297,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 20,
-            "exp_growth": 17
+            "exp_growth": 17,
+            "is_evolved": true
         },
         {
             "name": "Snowman",
@@ -313,7 +315,7 @@
             "mp_growth": 0,
             "hp_growth": 20,
             "exp_growth": 15,
-            "evolvesInto": "Saber"
+            "evolves_into": "Saber"
         },
         {
             "name": "Ashra",
@@ -330,7 +332,8 @@
             "mp_growth": 0,
             "hp_growth": 17,
             "exp_growth": 15,
-            "talents": "StrengthIncreased"
+            "talents": "StrengthIncreased",
+            "is_evolved": true
         },
         {
             "name": "Arachne",
@@ -347,7 +350,7 @@
             "mp_growth": 0,
             "hp_growth": 16,
             "exp_growth": 14,
-            "evolvesInto": "Ashra",
+            "evolves_into": "Ashra",
             "talents": "StrengthIncreased"
         },
         {
@@ -365,7 +368,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 19,
-            "exp_growth": 18
+            "exp_growth": 18,
+            "is_evolved": true
         },
         {
             "name": "Nyuel",
@@ -383,7 +387,7 @@
             "mp_growth": 0,
             "hp_growth": 15,
             "exp_growth": 14,
-            "evolvesInto": "Battnel"
+            "evolves_into": "Battnel"
         },
         {
             "name": "Death",
@@ -400,7 +404,8 @@
             "mp_growth": 0,
             "hp_growth": 19,
             "exp_growth": 16,
-            "talents": "MagicAttackIncreased"
+            "talents": "MagicAttackIncreased",
+            "is_evolved": true
         },
         {
             "name": "Clown",
@@ -417,7 +422,7 @@
             "mp_growth": 0,
             "hp_growth": 18,
             "exp_growth": 18,
-            "evolvesInto": "Death",
+            "evolves_into": "Death",
             "talents": "MagicAttackIncreased"
         },
         {
@@ -434,7 +439,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 22,
-            "exp_growth": 20
+            "exp_growth": 20,
+            "is_evolved": true
         },
         {
             "name": "Unicorn",
@@ -451,7 +457,7 @@
             "mp_growth": 0,
             "hp_growth": 20,
             "exp_growth": 14,
-            "evolvesInto": "Univern"
+            "evolves_into": "Univern"
         },
         {
             "name": "Metal",
@@ -468,7 +474,8 @@
             "mp_growth": 0,
             "hp_growth": 17,
             "exp_growth": 18,
-            "talents": "Hard"
+            "talents": "Hard",
+            "is_evolved": true
         },
         {
             "name": "Block",
@@ -485,7 +492,7 @@
             "mp_growth": 0,
             "hp_growth": 16,
             "exp_growth": 16,
-            "evolvesInto": "Metal",
+            "evolves_into": "Metal",
             "talents": "Hard"
         },
         {
@@ -811,7 +818,8 @@
             "luck_growth": 0,
             "mp_growth": 0,
             "hp_growth": 19,
-            "exp_growth": 18
+            "exp_growth": 18,
+            "talents": "Atrocious"
         },
         {
             "name": "Garuda",
@@ -914,15 +922,82 @@
     },
     "floors": [
         [
-            { "monster": "Pulunpa", "level": 1, "weight": 2 },
-            { "monster": "Troll", "level": 2, "weight": 10 },
-            { "monster": "Noise", "level": 1, "weight": 1 }
+            { "monster": "Pulunpa", "level": 1, "weight": 4 },
+            { "monster": "Troll", "level": 2, "weight": 2 },
+            { "monster": "Noise", "level": 1, "weight": 2 },
+            { "monster": "Cyclone", "level": 3, "weight": 1 },
+            { "monster": "Baloon", "level": 3, "weight": 1 },
+            { "monster": "Flame", "level": 2, "weight": 2 }
         ],
         [
-            { "monster": "Flame", "level": 3, "weight": 1 },
-            { "monster": "Pulunpa", "level": 1, "weight": 4 },
-            { "monster": "Troll", "level": 2, "weight": 5 },
-            { "monster": "Noise", "level": 1, "weight": 6 }
+            { "monster": "Flame", "level": 2, "weight": 4 },
+            { "monster": "Cyclone", "level": 3, "weight": 3 },
+            { "monster": "Baloon", "level": 3, "weight": 3 },
+            { "monster": "Clown", "level": 3, "weight": 2 },
+            { "monster": "Manoeva", "level": 4, "weight": 1 },
+            { "monster": "U-Boat", "level": 4, "weight": 1 },
+            { "monster": "Blume", "level": 3, "weight": 2 }
+        ],
+		[
+            { "monster": "Volcano", "level": 5, "weight": 2 },
+            { "monster": "U-Boat", "level": 4, "weight": 4 },
+            { "monster": "Blume", "level": 3, "weight": 4 },
+            { "monster": "Clown", "level": 3, "weight": 4 },
+            { "monster": "Griffon", "level": 5, "weight": 2 },
+            { "monster": "Dreamin", "level": 5, "weight": 3 },
+            { "monster": "Kraken", "level": 6, "weight": 1 }
+        ],
+ 		[
+            { "monster": "Griffon", "level": 5, "weight": 4 },
+            { "monster": "Nyuel", "level": 6, "weight": 3 },
+            { "monster": "Volcano", "level": 5, "weight": 4 },
+            { "monster": "Garuda", "level": 6, "weight": 3 },
+            { "monster": "Kraken", "level": 5, "weight": 2 },
+            { "monster": "Barong", "level": 8, "weight": 2 }
+        ],
+		[
+            { "monster": "Garuda", "level": 6, "weight": 4 },
+            { "monster": "Picket", "level": 7, "weight": 6 },
+            { "monster": "Arachne", "level": 8, "weight": 2 },
+            { "monster": "Weadog", "level": 8, "weight": 2 },
+            { "monster": "Unicorn", "level": 8, "weight": 2 },
+            { "monster": "Viper", "level": 7, "weight": 3 }
+        ],
+		[
+            { "monster": "Unicorn", "level": 8, "weight": 4 },
+            { "monster": "Viper", "level": 7, "weight": 4 },
+            { "monster": "Stealth", "level": 8, "weight": 3 },
+            { "monster": "Block", "level": 8, "weight": 3 },
+            { "monster": "Zu", "level": 9, "weight": 2 }
+        ],
+		[
+            { "monster": "Block", "level": 8, "weight": 4 },
+            { "monster": "Stealth", "level": 8, "weight": 4 },
+            { "monster": "Zu", "level": 9, "weight": 3 },
+            { "monster": "Snowman", "level": 9, "weight": 2 },
+            { "monster": "Mandara", "level": 9, "weight": 2 },
+            { "monster": "Naplass", "level": 9, "weight": 1 }
+        ],
+		[
+            { "monster": "Naplass", "level": 9, "weight": 3 },
+            { "monster": "Snowman", "level": 9, "weight": 3 },
+            { "monster": "Mandara", "level": 9, "weight": 3 },
+            { "monster": "Killer", "level": 11, "weight": 3 },
+            { "monster": "Tyrant", "level": 10, "weight": 2 },
+            { "monster": "Barong", "level": 8, "weight": 2 }
+        ],
+		[
+            { "monster": "Tyrant", "level": 10, "weight": 5 },
+            { "monster": "Glacier", "level": 11, "weight": 3 },
+            { "monster": "Dragon", "level": 11, "weight": 2 },
+            { "monster": "Maximum", "level": 11, "weight": 1 },
+            { "monster": "Golem", "level": 11, "weight": 1 }
+        ],
+		[
+            { "monster": "Dragon", "level": 11, "weight": 1 },
+            { "monster": "Golem", "level": 11, "weight": 1 },
+            { "monster": "Glacier", "level": 11, "weight": 1 },
+            { "monster": "Maximum", "level": 11, "weight": 1 }
         ]
     ]
 }

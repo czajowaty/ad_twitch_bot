@@ -15,7 +15,10 @@ class StateItemEvent(StateBase):
         self._context.add_response(f"You come across {item.name}. Do you want to pick it up?")
 
     def _select_item(self):
-        return self._item or self._context.rng.choice(all_items())
+        return self._item or self._context.random_selection_with_weights(self._found_items_weights())
+
+    def _found_items_weights(self):
+        return dict((item, self.game_config.found_items_weights[item.name]) for item in all_items())
 
     @classmethod
     def _parse_args(cls, context, args):

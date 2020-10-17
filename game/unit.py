@@ -1,9 +1,10 @@
 import logging
 from game.config import Config
+from game.errors import InvalidOperation
 from game.genus import Genus
 from game.spell import Spell
 from game.talents import Talents
-from game.traits import UnitTraits
+from game.traits import SpellTraits, UnitTraits
 from game.stats_calculator import StatsCalculator
 from game.statuses import Statuses
 
@@ -27,9 +28,9 @@ class Unit:
         self.luck = traits.base_luck
         self.clear_statuses()
         if traits.native_spell_traits is not None:
-            self.spell = Spell(traits.native_spell_traits)
+            self.set_spell(traits.native_spell_traits, self.level)
         else:
-            self.spell = None
+            self.clear_spell()
         self.exp = 0
 
     @property
@@ -69,7 +70,8 @@ class Unit:
 
     @property
     def max_hp(self):
-        return self._max_hp
+        multiplier = 2 if self.talents.has(Talents.HpIncreased) else 1
+        return self._max_hp * multiplier
 
     @max_hp.setter
     def max_hp(self, value):
@@ -99,7 +101,8 @@ class Unit:
 
     @property
     def max_mp(self):
-        return self._max_mp
+        multiplier = 2 if self.talents.has(Talents.MpIncreased) else 1
+        return self._max_mp * multiplier
 
     @max_mp.setter
     def max_mp(self, value):
@@ -120,13 +123,16 @@ class Unit:
         self.mp = self.max_mp
 
     def use_mp(self, mp_usage):
+        if self.talents.has(Talents.MpConsumptionDecreased):
+            mp_usage -= mp_usage // 2
         self.mp -= mp_usage
         if self.mp < 0:
             self.mp = 0
 
     @property
     def attack(self):
-        return int(self._attack * self._stat_factor())
+        multiplier = 2 if self.talents.has(Talents.StrengthIncreased) else 1
+        return int(self._attack * self._stat_factor() * multiplier)
 
     @attack.setter
     def attack(self, value):
@@ -134,7 +140,8 @@ class Unit:
 
     @property
     def defense(self):
-        return int(self._defense * self._stat_factor())
+        multiplier = 2 if self.talents.has(Talents.Hard) else 1
+        return int(self._defense * self._stat_factor() * multiplier)
 
     @defense.setter
     def defense(self, value):
@@ -175,18 +182,27 @@ class Unit:
 
     @property
     def spell(self) -> Spell:
-        return self._spell
-
-    @spell.setter
-    def spell(self, value: Spell):
-        self._spell = value
+        if not self.has_spell():
+            return None
+        spell_level = self._spell_level
+        if self.talents.has(Talents.MagicAttackIncreased):
+            spell_level *= 2
+        return Spell(self._spell_traits, spell_level)
 
     def has_spell(self) -> bool:
-        return self.spell is not None
+        return self._spell_traits is not None
+
+    def set_spell(self, traits: SpellTraits, level: int):
+        self._spell_traits = traits
+        self._spell_level = level
+
+    def clear_spell(self):
+        self._spell_traits = None
+        self._spell_level = 0
 
     @property
     def spell_mp_cost(self) -> int:
-        return self.spell.traits.mp_cost
+        return self._spell_traits.mp_cost
 
     def has_enough_mp_for_spell(self) -> bool:
         return self.mp >= self.spell_mp_cost
@@ -214,6 +230,20 @@ class Unit:
             return 0
         return self._levels.experience_for_next_level(self.level)
 
+    def fuse(self, other: '__class__'):
+        self._talents = self.traits.talents | other.traits.talents
+        if self.genus.is_weak_against(other.genus):
+            self._genus = other.genus
+
+    def does_evolve(self) -> bool:
+        return self.traits.does_evolve()
+
+    def evolve(self, evolved_unit_traits: UnitTraits):
+        if not self.does_evolve():
+            raise InvalidOperation(f'{self.name} does not evolve.')
+        self._traits = evolved_unit_traits
+        self.name = evolved_unit_traits.name
+
     def _level_up(self):
         are_stats_boosted = self.has_boosted_stats()
         if are_stats_boosted:
@@ -230,45 +260,31 @@ class Unit:
 
     def _increase_hp_on_level_up(self):
         hp_increase = self._stats_calculator().hp_increase(self.level)
-        if self.talents.has(Talents.HpIncreased):
-            hp_increase *= 2
-        self.max_hp += hp_increase
-        self.hp += hp_increase
+        self._max_hp += hp_increase
+        self._hp += hp_increase
 
     def _increase_mp_on_level_up(self):
         mp_increase = self._stats_calculator().mp_increase(self.level)
-        if self.talents.has(Talents.MpIncreased):
-            mp_increase *= 2
-        self.max_mp += mp_increase
-        self.mp += mp_increase
+        self._max_mp += mp_increase
+        self._mp += mp_increase
 
     def _increase_attack_on_level_up(self):
-        attack_increase = self._stats_calculator().attack_increase(self.level)
-        if self.talents.has(Talents.StrengthIncreased):
-            attack_increase *= 2
-        self.attack += attack_increase
+        self._attack += self._stats_calculator().attack_increase(self.level)
 
     def _increase_defense_on_level_up(self):
-        defense_increase = self._stats_calculator().defense_increase(self.level)
-        if self.talents.has(Talents.Hard):
-            defense_increase *= 2
-        self.defense += defense_increase
+        self._defense += self._stats_calculator().defense_increase(self.level)
 
     def _increase_luck_on_level_up(self):
-        self.luck += self._stats_calculator().luck_increase(self.level)
+        self._luck += self._stats_calculator().luck_increase(self.level)
 
     def _increase_spell_level_on_level_up(self):
         if not self.has_spell():
             return
-        if self.spell.traits.genus != self.genus:
+        if self._spell_traits.genus != self.genus:
             return
-        spell_level_increase = 1
-        if self.talents.has(Talents.MagicAttackIncreased):
-            spell_level_increase *= 2
-        self.spell.level += spell_level_increase
-        if self.spell.level < self.level:
-            self.spell.level += spell_level_increase
-            self.spell.level = min(self.spell.level, self.level)
+        self._spell_level += 1
+        if self._spell_level < self.level:
+            self._spell_level += 1
 
     def _stats_calculator(self) -> StatsCalculator:
         return StatsCalculator(self.traits)

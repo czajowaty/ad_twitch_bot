@@ -17,7 +17,7 @@ class StateTrapEvent(StateBase):
         self._context.generate_action(command)
 
     def _select_trap(self):
-        return self._trap or self._context.rng.choice(list(self.TRAPS.keys()))
+        return self._trap or self._context.random_selection_with_weights(self.game_config.traps_weights)
 
     def _familiar(self) -> Unit:
         return self._context.familiar

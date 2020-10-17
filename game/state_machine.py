@@ -6,15 +6,17 @@ from game.state_battle import StateBattleEvent, StateStartBattle, StateBattlePre
     StateBattlePhase, StateBattlePlayerTurn, StateBattleAttack, StateBattleUseSpell, StateBattleUseItem, \
     StateBattleTryToFlee, StateBattleEnemyTurn
 from game.state_character import StateCharacterEvent, StateItemTrade, StateItemTradeAccepted, StateItemTradeRejected, \
-    StateFamiliarTrade, StateFamiliarTradeAccepted, StateFamiliarTradeRejected
+    StateFamiliarTrade, StateFamiliarTradeAccepted, StateFamiliarTradeRejected, StateEvolveFamiliar
 from game.state_elevator import StateElevatorEvent, StateGoUp, StateElevatorOmitted, StateNextFloor
+from game.state_event import StateWaitForEvent, StateGenerateEvent
+from game.state_familiar import StateFamiliarEvent, StateMetFamiliarIgnore, StateFamiliarFusion, \
+    StateFamiliarReplacement
 from game.state_initialize import StateInitialize
 from game.state_item import StateItemEvent, StateItemPickUp, StateItemPickUpFullInventory, StateItemPickUpIgnored, \
     StateItemEventFinished
 from game.state_machine_action import StateMachineAction
 from game.state_machine_context import StateMachineContext
 from game.state_trap import StateTrapEvent
-from game.state_wait_for_event import StateWaitForEvent
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +57,15 @@ class StateMachine:
         StateStart: {commands.STARTED: Transition.by_admin(StateInitialize)},
         StateInitialize: {commands.INITIALIZED: Transition.by_admin(StateWaitForEvent)},
         StateWaitForEvent: {
+            commands.GENERATE_EVENT: Transition.by_admin(StateGenerateEvent),
             commands.BATTLE_EVENT: Transition.by_admin(StateBattleEvent),
             commands.ITEM_EVENT: Transition.by_admin(StateItemEvent),
             commands.TRAP_EVENT: Transition.by_admin(StateTrapEvent),
             commands.CHARACTER_EVENT: Transition.by_admin(StateCharacterEvent),
-            commands.ELEVATOR_EVENT: Transition.by_admin(StateElevatorEvent)
+            commands.ELEVATOR_EVENT: Transition.by_admin(StateElevatorEvent),
+            commands.FAMILIAR_EVENT: Transition.by_admin(StateFamiliarEvent)
         },
+        StateGenerateEvent: {commands.EVENT_GENERATED: Transition.by_admin(StateWaitForEvent)},
         StateBattleEvent: {commands.START_BATTLE: Transition.by_admin(StateStartBattle)},
         StateStartBattle: {commands.BATTLE_PREPARE_PHASE: Transition.by_admin(StateBattlePreparePhase)},
         StateBattlePreparePhase: {
@@ -127,6 +132,7 @@ class StateMachine:
         StateCharacterEvent: {
             commands.START_ITEM_TRADE: Transition.by_admin(StateItemTrade),
             commands.START_FAMILIAR_TRADE: Transition.by_admin(StateFamiliarTrade),
+            commands.EVOLVE_FAMILIAR: Transition.by_admin(StateEvolveFamiliar),
             commands.START_BATTLE: Transition.by_admin(StateStartBattle),
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)
         },
@@ -142,6 +148,15 @@ class StateMachine:
         },
         StateFamiliarTradeAccepted: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
         StateFamiliarTradeRejected: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateEvolveFamiliar: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateFamiliarEvent: {
+            commands.IGNORE: Transition.by_user(StateMetFamiliarIgnore),
+            commands.FUSE: Transition.by_user(StateFamiliarFusion),
+            commands.REPLACE: Transition.by_user(StateFamiliarReplacement)
+        },
+        StateMetFamiliarIgnore: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateFamiliarFusion: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
+        StateFamiliarReplacement: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
         StateGameOver: {commands.RESTART: Transition.by_admin(StateStart)}
     }
 

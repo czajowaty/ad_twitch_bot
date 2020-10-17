@@ -1,6 +1,7 @@
 from collections.abc import Mapping, Sequence
 import json
 from game.floor_descriptor import FloorDescriptor, Monster
+from game.items import all_items
 from game.traits import UnitTraits, Genus, Talents, SpellTraits
 
 
@@ -32,6 +33,10 @@ class Config:
 
     def __init__(self):
         self._probabilities = self.Probabilities()
+        self.events_weights = {}
+        self.character_events_weights = {}
+        self.traps_weights = {}
+        self.found_items_weights = {}
         self._levels = self.Levels()
         self._monsters_traits = {}
         self._special_units_traits = self.SpecialUnitsTraits()
@@ -72,6 +77,10 @@ class Config:
         try:
             config_json = json.loads(config_json_string)
             cls._read_probabilities(config._probabilities, config_json['probabilities'])
+            config.events_weights = config_json['events_weights']
+            config.found_items_weights = config_json['found_items_weights']
+            config.character_events_weights = config_json['characters_events_weights']
+            config.traps_weights = config_json['traps_weights']
             cls._read_levels(config._levels, config_json['experience_per_level'])
             config._monsters_traits = cls._create_monsters_traits(config_json['monsters'])
             config._special_units_traits = cls._create_special_units_traits(config_json['special_units'])
@@ -130,6 +139,7 @@ class Config:
             unit_traits.native_spell_traits = cls._parse_spell(unit_json.get('spell'))
             unit_traits.talents = cls._parse_talents(unit_json.get('talents'))
             unit_traits.is_evolved = unit_json.get('is_evolved', False)
+            unit_traits.evolves_into = unit_json.get('evolves_into')
         except KeyError as exc:
             raise cls.InvalidConfig(f"{unit_json}: missing key {exc}")
         except ValueError as exc:
@@ -222,7 +232,12 @@ class Config:
     @classmethod
     def _validate_config(cls, config):
         cls._validate_probabilities(config)
+        cls._validate_events_weights(config)
+        cls._validate_found_items_weights(config)
+        cls._validate_characters_events_weights(config)
+        cls._validate_traps_weights(config)
         cls._validate_experience_per_level(config)
+        cls._validate_monsters_traits(config)
         cls._validate_floors(config)
 
     @classmethod
@@ -239,9 +254,57 @@ class Config:
                 f'Probability "{name}"={probability} is outside range [{min_probability}-{max_probability}]')
 
     @classmethod
+    def _validate_events_weights(cls, config):
+        cls._validate_weights_dictionary(
+            'events_weights',
+            config.events_weights,
+            ['battle', 'character', 'elevator', 'item', 'trap', 'familiar'])
+
+    @classmethod
+    def _validate_found_items_weights(cls, config):
+        cls._validate_weights_dictionary(
+            'found_items_weights',
+            config.found_items_weights,
+            [item.name for item in all_items()])
+
+    @classmethod
+    def _validate_characters_events_weights(cls, config):
+        cls._validate_weights_dictionary(
+            'character_events_weights',
+            config.character_events_weights,
+            ['Cherrl', 'Nico', 'Patty', 'Fur', 'Selfi', 'Mia', 'Vivianne', 'Ghosh', 'Beldo'])
+
+    @classmethod
+    def _validate_traps_weights(cls, config):
+        cls._validate_weights_dictionary(
+            'traps_weights',
+            config.traps_weights,
+            ['Poison', 'Sleep', 'Upheaval', 'Crack', 'Go up', 'Paralyze', 'Blinder'])
+
+    @classmethod
+    def _validate_weights_dictionary(cls, dictionary_name, weights_dictionary, expected_keys):
+        missing_keys = set(expected_keys) - set(weights_dictionary.keys())
+        if len(missing_keys) > 0:
+            missing_keys_string = ', '.join(f'"{missing_key}"' for missing_key in missing_keys)
+            raise cls.InvalidConfig(f'"{dictionary_name}" - missing weights for: {missing_keys_string}')
+        excessive_keys = set(weights_dictionary.keys()) - set(expected_keys)
+        if len(excessive_keys) > 0:
+            excessive_keys_string = ', '.join(f'"{excessive_key}"' for excessive_key in excessive_keys)
+            raise cls.InvalidConfig(f'"{dictionary_name}" - excessive_keys weights for: {excessive_keys_string}')
+        if sum(weights_dictionary.values()) == 0:
+            raise cls.InvalidConfig(f'"{dictionary_name}" - all weights are 0s')
+
+    @classmethod
     def _validate_experience_per_level(cls, config):
         if config.levels.max_level == 0:
             raise cls.InvalidConfig(f'No levels defined')
+
+    @classmethod
+    def _validate_monsters_traits(cls, config):
+        for monster_trait in config.monsters_traits.values():
+            if monster_trait.does_evolve() and monster_trait.evolves_into not in config.monsters_traits:
+                raise cls.InvalidConfig(
+                    f'{monster_trait.name} - unknown monster to evolve to - {monster_trait.evolves_into}')
 
     @classmethod
     def _validate_floors(cls, config):
