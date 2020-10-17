@@ -1,3 +1,4 @@
 .project
 .pydevproject
 *.pyc
+my_bot_config.json
