@@ -1,6 +1,15 @@
 {
+    "timers": {
+        "event_interval": 300,
+        "event_penalty_duration": 200,
+        "game_restart_wait_time": 1800
+    },
     "probabilities": {
         "flee": 0.65
+    },
+    "player_selection_weights": {
+        "without_penalty": 10,
+        "with_penalty": 2
     },
     "events_weights": {
         "battle": 1,

@@ -3,5 +3,6 @@
     "CLIENT_ID": "",
     "NICK": "",
     "PREFIX": "!",
-    "CHANNEL": "#"
+    "CHANNEL": "#",
+    "EXCLUDED_PLAYERS": []
 }

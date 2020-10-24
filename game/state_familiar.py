@@ -19,6 +19,9 @@ class StateFamiliarEvent(StateWithMonster):
         return UnitCreator(monsters_traits[familiar_name]) \
             .create(level=current_familiar.level, levels=self.game_config.levels)
 
+    def is_waiting_for_user_action(self) -> bool:
+        return True
+
 
 class StateMetFamiliarIgnore(StateBase):
     def on_enter(self):

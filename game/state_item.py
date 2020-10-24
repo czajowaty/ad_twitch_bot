@@ -20,6 +20,9 @@ class StateItemEvent(StateBase):
     def _found_items_weights(self):
         return dict((item, self.game_config.found_items_weights[item.name]) for item in all_items())
 
+    def is_waiting_for_user_action(self) -> bool:
+        return True
+
     @classmethod
     def _parse_args(cls, context, args):
         if len(args) == 0:

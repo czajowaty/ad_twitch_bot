@@ -9,9 +9,20 @@ class Config:
     class InvalidConfig(Exception):
         pass
 
+    class Timers:
+        def __init__(self):
+            self.event_interval = 0
+            self.event_penalty_duration = 0
+            self.game_restart_wait_time = 0
+
     class Probabilities:
         def __init__(self):
-            self.flee = 0.65
+            self.flee = 0.0
+
+    class PlayerSelectionWeights:
+        def __init__(self):
+            self.without_penalty = 0
+            self.with_penalty = 0
 
     class Levels:
         def __init__(self):
@@ -32,7 +43,9 @@ class Config:
             self.ghosh = UnitTraits()
 
     def __init__(self):
+        self._timers = self.Timers()
         self._probabilities = self.Probabilities()
+        self._player_selection_weights = self.PlayerSelectionWeights()
         self.events_weights = {}
         self.character_events_weights = {}
         self.traps_weights = {}
@@ -43,8 +56,16 @@ class Config:
         self._floors = []
 
     @property
+    def timers(self):
+        return self._timers
+
+    @property
     def probabilities(self):
         return self._probabilities
+
+    @property
+    def player_selection_weights(self):
+        return self._player_selection_weights
 
     @property
     def levels(self):
@@ -67,16 +88,19 @@ class Config:
         return len(self._floors)
 
     @classmethod
-    def from_file(cls, config_file_name) -> '__class__':
-        with open(config_file_name) as config_file:
-            return cls.from_json(config_file.read())
+    def from_file(cls, config_file) -> '__class__':
+        return cls.from_json(config_file.read())
 
     @classmethod
     def from_json(cls, config_json_string) -> '__class__':
         config = Config()
         try:
             config_json = json.loads(config_json_string)
+            cls._read_timers(config._timers, config_json['timers'])
             cls._read_probabilities(config._probabilities, config_json['probabilities'])
+            cls._read_player_selection_weights(
+                config._player_selection_weights,
+                config_json['player_selection_weights'])
             config.events_weights = config_json['events_weights']
             config.found_items_weights = config_json['found_items_weights']
             config.character_events_weights = config_json['characters_events_weights']
@@ -93,11 +117,28 @@ class Config:
         return config
 
     @classmethod
-    def _read_probabilities(cls, probabilities: '__class__.Probabilities', probabilities_json):
+    def _read_timers(cls, timers: '__class__.Timers', timers_json):
+        try:
+            timers.event_interval = int(timers_json['event_interval'])
+            timers.event_penalty_duration = int(timers_json['event_penalty_duration'])
+            timers.game_restart_wait_time = int(timers_json['game_restart_wait_time'])
+        except ValueError as exc:
+            raise cls.InvalidConfig(f"{timers_json}: {exc}")
+
+    @classmethod
+    def _read_probabilities(cls, probabilities, probabilities_json):
         try:
             probabilities.flee = float(probabilities_json['flee'])
         except ValueError as exc:
             raise cls.InvalidConfig(f"{probabilities_json}: {exc}")
+
+    @classmethod
+    def _read_player_selection_weights(cls, player_selection_weights, player_selection_weights_json):
+        try:
+            player_selection_weights.without_penalty = player_selection_weights_json['without_penalty']
+            player_selection_weights.with_penalty = player_selection_weights_json['with_penalty']
+        except ValueError as exc:
+            raise cls.InvalidConfig(f"{player_selection_weights_json}: {exc}")
 
     @classmethod
     def _read_levels(cls, levels: '__class__.Levels', levels_json):

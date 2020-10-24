@@ -1,3 +1,5 @@
+import copy
+import jsonpickle
 import logging
 from game.errors import InvalidOperation
 from game.state_machine_context import StateMachineContext
@@ -15,6 +17,17 @@ class StateBase:
     def __init__(self, context: StateMachineContext):
         self._context = context
 
+    def to_json(self):
+        state_copy = copy.deepcopy(self)
+        del state_copy._context
+        return jsonpickle.encode(state_copy)
+
+    @classmethod
+    def from_json(cls, state_json, context: StateMachineContext):
+        state = jsonpickle.decode(state_json)
+        state._context = context
+        return state
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -29,6 +42,12 @@ class StateBase:
 
     def on_enter(self):
         logger.debug(f"{self}.on_enter()")
+
+    def is_waiting_for_user_action(self) -> bool:
+        return False
+
+    def is_waiting_for_event(self) -> bool:
+        return False
 
     @classmethod
     def create(cls, context, args):

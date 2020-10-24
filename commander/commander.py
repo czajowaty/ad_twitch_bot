@@ -1,44 +1,70 @@
-import re
+import asyncio
+from game.controller import Config, Controller
 
 
 class Commander:
-    def __init__(self):
-        self.a = ''
+    EXIT_COMMAND = 'exit'
+    JOIN_COMMAND = 'join'
+    PART_COMMAND = 'part'
+    ADMIN_COMMAND = 'admin'
+
+    class InvalidCommand(Exception):
+        pass
+
+    def __init__(self, game_config: Config):
+        self._controller = Controller(game_config)
+        self._controller.set_response_event_handler(self._response_event_handler)
+
+    def _response_event_handler(self, response: str) -> bool:
+        print(response)
+        return True
 
     def run(self):
-        command = ''
-        while command != 'exit':
-            command_line = input("Enter command: ")
-            command, args = self._parse_command_line(command_line)
-            print(f"You entered {command}, {args}")
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self._get_and_execute_commands())
 
-    def _parse_command_line(self, command):
-        parsed_command = [s.strip() for s in re.split("\s+", command)]
-        parsed_command = [s for s in parsed_command if len(s) > 0]
-        if len(parsed_command) > 0:
-            return parsed_command[0].lower(), parsed_command[1:]
-        else:
-            return '', []
+    async def _get_and_execute_commands(self):
+        while True:
+            player_name, is_admin, command, args = await asyncio.to_thread(self._get_command)
+            if command == self.EXIT_COMMAND:
+                return
+            elif command == self.JOIN_COMMAND:
+                self._controller.add_active_player(player_name)
+            elif command == self.PART_COMMAND:
+                self._controller.remove_active_player(player_name)
+            else:
+                if is_admin:
+                    self._controller.handle_admin_action(player_name, command, args)
+                else:
+                    self._controller.handle_user_action(player_name, command, args)
 
+    def _get_command(self):
+        while True:
+            command_line = input("Enter command [@player_name command arg1 arg2 arg3 ...]: ")
+            try:
+                return self._parse_to_command(command_line)
+            except self.InvalidCommand as exc:
+                print(f"Invalid command: {exc}")
 
-if __name__ == '__main__':
-    import logging
-    from game.config import Config
-    from game.state_machine import StateMachine
-    from game.state_machine_action import StateMachineAction
+    def _parse_to_command(self, command_line: str):
+        splitted = command_line.split()
+        if len(splitted) == 0:
+            raise self.InvalidCommand('Cannot be empty.')
+        if splitted[0] == self.EXIT_COMMAND:
+            return self._build_command(command=self.EXIT_COMMAND)
+        if len(splitted) == 1:
+            raise self.InvalidCommand('Too short.')
+        player_name = splitted[0]
+        if not player_name.startswith('@'):
+            raise self.InvalidCommand('Player name needs to start with "@" character.')
+        player_name = player_name.lstrip('@')
+        command, args = splitted[1], splitted[2:]
+        is_admin = (command == self.ADMIN_COMMAND)
+        if is_admin:
+            if len(args) == 0:
+                raise self.InvalidCommand('Too short.')
+            command, args = args[0], args[1:]
+        return self._build_command(player_name, is_admin, command, args)
 
-    logging.basicConfig(level=logging.DEBUG)
-    game_config = Config.from_file('../game_config.json')
-    state_machine = StateMachine(game_config, "TestPlayer")
-    responses = state_machine.on_action(StateMachineAction('started', is_given_by_admin=True))
-    for response in responses:
-        print(response)
-    while True:
-        command_line = input("Enter command: ")
-        splitted = command_line.split(' ')
-        command, args = splitted[0], splitted[1:]
-        if command == 'exit':
-            break
-        responses = state_machine.on_action(StateMachineAction(command, args, is_given_by_admin=True))
-        for response in responses:
-            print(response)
+    def _build_command(self, player_name: str='', is_admin: bool=False, command: str='', args: list[str]=[]):
+        return player_name, is_admin, command, args

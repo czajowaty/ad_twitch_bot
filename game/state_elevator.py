@@ -28,6 +28,5 @@ class StateNextFloor(StateBase):
             self._context.add_response(f"You entered {floor}F.")
             self._context.generate_action(commands.EVENT_FINISHED)
         else:
-            self._context.add_response(
-                f"You have conquered the Tower! Congratulations! You receive 300 channel points.")
+            self._context.add_response(f"You have conquered the Tower! Congratulations!")
             self._context.generate_action(commands.RESTART)

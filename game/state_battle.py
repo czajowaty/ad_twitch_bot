@@ -63,6 +63,9 @@ class StateBattlePreparePhase(StateBattleBase):
         if not self._battle_context.is_prepare_phase():
             self._context.generate_action(commands.BATTLE_PREPARE_PHASE_FINISHED)
 
+    def is_waiting_for_user_action(self) -> bool:
+        return True
+
     @classmethod
     def _parse_args(cls, context, args):
         return args[0],
@@ -282,6 +285,9 @@ class StateBattlePhase(StateBattlePhaseBase):
 class StateBattlePlayerTurn(StateBattlePhaseBase):
     def on_enter(self):
         self._context.add_response(f"Your turn.")
+
+    def is_waiting_for_user_action(self) -> bool:
+        return True
 
 
 class StateBattleAttack(StateBattlePhaseBase):

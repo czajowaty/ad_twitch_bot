@@ -24,6 +24,7 @@ class StateCharacterEvent(StateBase):
         character_events_weights = dict(self.game_config.character_events_weights)
         if not self._context.familiar.does_evolve():
             del character_events_weights['Mia']
+        return character_events_weights
 
     def _handle_cherrl_encounter(self):
         familiar = self._context.familiar

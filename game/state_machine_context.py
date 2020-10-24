@@ -1,3 +1,5 @@
+import copy
+import jsonpickle
 import random
 from game.config import Config
 from game.errors import InvalidOperation
@@ -63,9 +65,8 @@ class BattleContext:
 
 
 class StateMachineContext:
-    def __init__(self, game_config: Config, player_name: str):
+    def __init__(self, game_config: Config):
         self._game_config = game_config
-        self._player_name = player_name
         self._is_game_finished = False
         self._floor = 0
         self._familiar = None
@@ -77,13 +78,20 @@ class StateMachineContext:
         self._responses = []
         self._generated_action = None
 
+    def to_json(self):
+        context_copy = copy.deepcopy(self)
+        del context_copy._game_config
+        return jsonpickle.encode(context_copy)
+
+    @classmethod
+    def from_json(cls, context_json, game_config):
+        context = jsonpickle.decode(context_json)
+        context._game_config = game_config
+        return context
+
     @property
     def game_config(self):
         return self._game_config
-
-    @property
-    def player_name(self):
-        return self._player_name
 
     @property
     def floor(self):

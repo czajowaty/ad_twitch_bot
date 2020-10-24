@@ -11,6 +11,9 @@ class StateWaitForEvent(StateBase):
         if self._event_command is not None:
             self._context.generate_action(self._event_command)
 
+    def is_waiting_for_event(self) -> bool:
+        return True
+
     @classmethod
     def _parse_args(cls, context, args):
         if len(args) == 0:
