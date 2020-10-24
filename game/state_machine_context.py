@@ -67,7 +67,7 @@ class BattleContext:
 class StateMachineContext:
     def __init__(self, game_config: Config):
         self._game_config = game_config
-        self._is_game_finished = False
+        self._is_tutorial_done = False
         self._floor = 0
         self._familiar = None
         self._inventory = Inventory()
@@ -92,6 +92,13 @@ class StateMachineContext:
     @property
     def game_config(self):
         return self._game_config
+
+    @property
+    def is_tutorial_done(self) -> bool:
+        return self._is_tutorial_done
+
+    def set_tutorial_done(self):
+        self._is_tutorial_done = True
 
     @property
     def floor(self):

@@ -12,7 +12,7 @@ from game.state_elevator import StateElevatorEvent, StateGoUp, StateElevatorOmit
 from game.state_event import StateWaitForEvent, StateGenerateEvent
 from game.state_familiar import StateFamiliarEvent, StateMetFamiliarIgnore, StateFamiliarFusion, \
     StateFamiliarReplacement
-from game.state_initialize import StateInitialize
+from game.state_initialize import StateInitialize, StateEnterTower
 from game.state_item import StateItemEvent, StateItemPickUp, StateItemPickUpFullInventory, StateItemPickUpIgnored, \
     StateItemEventFinished
 from game.state_machine_action import StateMachineAction
@@ -50,15 +50,15 @@ class StateStart(StateBase):
 
 
 class StateGameOver(StateBase):
-    def on_enter(self):
-        self._context.generate_action(commands.RESTART)
+    pass
 
 
 class StateMachine:
     VERSION = 1
     TRANSITIONS = {
         StateStart: {commands.STARTED: Transition.by_admin(StateInitialize)},
-        StateInitialize: {commands.INITIALIZED: Transition.by_admin(StateWaitForEvent)},
+        StateInitialize: {commands.ENTER_TOWER: Transition.by_user(StateEnterTower)},
+        StateEnterTower: {commands.ENTERED_TOWER: Transition.by_admin(StateWaitForEvent)},
         StateWaitForEvent: {
             commands.GENERATE_EVENT: Transition.by_admin(StateGenerateEvent),
             commands.BATTLE_EVENT: Transition.by_admin(StateBattleEvent),
@@ -130,7 +130,7 @@ class StateMachine:
         StateElevatorOmitted: {commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent)},
         StateNextFloor: {
             commands.EVENT_FINISHED: Transition.by_admin(StateWaitForEvent),
-            commands.RESTART: Transition.by_admin(StateStart)
+            commands.FINISH_GAME: Transition.by_admin(StateGameOver)
         },
         StateCharacterEvent: {
             commands.START_ITEM_TRADE: Transition.by_admin(StateItemTrade),
@@ -169,7 +169,7 @@ class StateMachine:
         self._state = StateStart(self._context)
         self._event_selection_penalty_end_dt = None
         self._generic_actions_handlers = {
-            commands.HELP: (False, self._show_available_actions),
+            commands.HELP: (False, self._show_available_commands),
             commands.RESTART: (True, self._restart_state_machine),
             commands.SHOW_FAMILIAR_STATS: (False, self._handle_familiar_stats_query),
             commands.SHOW_INVENTORY: (False, self._handle_inventory_query),
@@ -214,7 +214,7 @@ class StateMachine:
         return type(self._state) is not StateStart
 
     def is_finished(self) -> bool:
-        return type(self._state) is not StateGameOver
+        return type(self._state) is StateGameOver
 
     def is_waiting_for_user_action(self) -> bool:
         return self._state.is_waiting_for_user_action()
@@ -255,7 +255,7 @@ class StateMachine:
         else:
             return False
 
-    def _show_available_actions(self, action: StateMachineAction):
+    def _show_available_commands(self, action: StateMachineAction):
         available_specific_commands = self._available_specific_commands(action.is_given_by_admin)
         if len(available_specific_commands) > 0:
             self._context.add_response(f"Specific commands: {', '.join(available_specific_commands)}.")
@@ -282,15 +282,30 @@ class StateMachine:
         return available_generic_commands
 
     def _handle_familiar_stats_query(self, action):
-        familiar = self._context.familiar
-        self._context.add_response(f"{familiar.to_string()}.")
+        if self._has_entered_tower():
+            familiar = self._context.familiar
+            self._context.add_response(f"{familiar.to_string()}.")
+        else:
+            self._handle_generic_action_before_entering_tower()
 
     def _handle_inventory_query(self, action):
-        inventory_string = ', '.join(self._context.inventory.items)
-        self._context.add_response(f"You have: {inventory_string}.")
+        if self._has_entered_tower():
+            inventory_string = ', '.join(self._context.inventory.items)
+            self._context.add_response(f"You have: {inventory_string}.")
+        else:
+            self._handle_generic_action_before_entering_tower()
 
     def _handle_floor_query(self, action):
-        self._context.add_response(f"You are on {self._context.floor + 1}F.")
+        if self._has_entered_tower():
+            self._context.add_response(f"You are on {self._context.floor + 1}F.")
+        else:
+            self._handle_generic_action_before_entering_tower()
+
+    def _handle_generic_action_before_entering_tower(self):
+        self._context.add_response(f"You did not enter the tower yet.")
+
+    def _has_entered_tower(self) -> bool:
+        return self.is_started() and type(self._state) is not StateInitialize
 
     def _handle_non_generic_action(self, action):
         state_transition_table = self._current_state_transition_table()

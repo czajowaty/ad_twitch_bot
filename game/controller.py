@@ -59,18 +59,22 @@ class Controller(GameInterface):
         self.add_active_player(player_name)
         player_state_machine = self._player_state_machine(player_name)
         responses = player_state_machine.on_action(action)
-        self._send_response(player_name, responses)
+        if len(responses) > 0:
+            self._send_response(player_name, responses)
         if player_state_machine.is_finished():
-            # TODO: do sth when player dies
-            pass
-
-    def _does_player_exist(self, player_name: str) -> bool:
-        return player_name in self._player_state_machines
+            self._restart_game(player_name)
 
     def _player_state_machine(self, player_name: str) -> StateMachine:
         if not self._does_player_exist(player_name):
             raise self.PlayerDoesNotExist(player_name)
         return self._player_state_machines[player_name]
+
+    def _does_player_exist(self, player_name: str) -> bool:
+        return player_name in self._player_state_machines
+
+    def _restart_game(self, player_name: str):
+        self._player_state_machine(player_name).on_action(self._admin_action(commands.RESTART))
+        self._start_game(player_name)
 
     def add_active_player(self, player_name: str):
         if self._is_player_active(player_name):
@@ -86,8 +90,11 @@ class Controller(GameInterface):
         return self._does_player_exist(player_name) and self._player_state_machine(player_name).is_started()
 
     def _start_game(self, player_name: str):
-        player_state_machine = StateMachine(self._game_config, player_name)
-        self._player_state_machines[player_name] = player_state_machine
+        if player_name not in self._player_state_machines:
+            player_state_machine = StateMachine(self._game_config, player_name)
+            self._player_state_machines[player_name] = player_state_machine
+        else:
+            player_state_machine = self._player_state_machines[player_name]
         responses = player_state_machine.on_action(self._admin_action(commands.STARTED))
         self._send_response(player_name, responses)
 

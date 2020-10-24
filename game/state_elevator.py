@@ -29,4 +29,4 @@ class StateNextFloor(StateBase):
             self._context.generate_action(commands.EVENT_FINISHED)
         else:
             self._context.add_response(f"You have conquered the Tower! Congratulations!")
-            self._context.generate_action(commands.RESTART)
+            self._context.generate_action(commands.FINISH_GAME)
