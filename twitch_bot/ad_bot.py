@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from twitch_bot.twitch_interface import TwitchInterface
 from twitchio.dataclasses import Channel, Message, User
@@ -48,7 +49,10 @@ class AdBot(commands.Bot, TwitchInterface):
         channel = self._get_channel()
         if channel is None:
             return False
-        channel.send(message)
+        index = 0
+        while index < len(message):
+            asyncio.create_task(channel.send(message[index:index + 500]))
+            index += 500
         return True
 
     def _get_channel(self) -> Channel:
@@ -59,10 +63,14 @@ class AdBot(commands.Bot, TwitchInterface):
         self._bot_connected_event_handler()
 
     async def event_join(self, user: User):
+        if self._is_excluded_user(user):
+            return
         logger.info(f"'{user.name}' joined channel.")
         self._join_event_handler(user)
 
     async def event_part(self, user: User):
+        if self._is_excluded_user(user):
+            return
         logger.info(f"'{user.name}' left channel.")
         self._part_event_handler(user)
 
@@ -71,13 +79,14 @@ class AdBot(commands.Bot, TwitchInterface):
         if self._is_excluded_user(user):
             return
         self._message_event_handler(user)
+        await self.handle_commands(message)
 
     def _is_excluded_user(self, user: User):
-        return user.name in self._excluded_user_names
+        return user.name.strip() in self._excluded_user_names
 
-    @commands.command(name='ad_bot')
+    @commands.command(name='adbot')
     async def _handle_ad_bot_command(self, ctx, *args):
         if len(args) == 0:
             return
-        command, command_args = args
+        command, command_args = args[0], args[1:]
         self._command_event_handler(ctx.author, command, command_args)

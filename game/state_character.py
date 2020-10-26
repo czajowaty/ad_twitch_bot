@@ -33,7 +33,7 @@ class StateCharacterEvent(StateBase):
         return (commands.EVENT_FINISHED, ()), 'You are fully healed.'
 
     def _handle_nico_encounter(self):
-        return (commands.EVENT_FINISHED, ()), 'You are cultured. You gain 100 channel points.'
+        return (commands.EVENT_FINISHED, ()), 'She gives you a lesson about culture and walks away.. '
 
     def _handle_patty_encounter(self):
         self._context.familiar.set_status(Statuses.StatsBoost)

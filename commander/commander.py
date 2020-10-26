@@ -1,5 +1,5 @@
 import asyncio
-from game.controller import Config, Controller
+from game.controller import Controller
 
 
 class Commander:
@@ -11,8 +11,8 @@ class Commander:
     class InvalidCommand(Exception):
         pass
 
-    def __init__(self, game_config: Config):
-        self._controller = Controller(game_config)
+    def __init__(self, controller: Controller):
+        self._controller = controller
         self._controller.set_response_event_handler(self._response_event_handler)
 
     def _response_event_handler(self, response: str) -> bool:

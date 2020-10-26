@@ -7,42 +7,42 @@ from twitch_bot.ad_bot import AdBot, User
 
 
 class TwitchGameMediator:
-    def __init__(self, bot_config: dict, game_config: GameConfig):
+    def __init__(self, bot_config: dict, game_controller: GameController):
         self._ad_twitch_bot = AdBot(bot_config)
-        self._game_controller = GameController(game_config)
+        self._game_controller = game_controller
         self._connect_twitch_if_events()
         self._connect_game_if_events()
 
-    def _connect_twicht_if_events(self):
-        self._twitch_if.set_bot_connected_event_handler(self._handle_bot_connected)
-        self._twitch_if.set_join_event_handler(self._handle_user_joined_channel)
-        self._twitch_if.set_part_event_handler(self._handle_user_left_channel)
-        self._twitch_if.set_message_event_handler(self._handle_user_sent_message)
-        self._twitch_if.set_command_event_handler(self._handle_user_command)
+    def _connect_twitch_if_events(self):
+        self._ad_twitch_bot.set_bot_connected_event_handler(self._handle_bot_connected)
+        self._ad_twitch_bot.set_join_event_handler(self._handle_user_joined_channel)
+        self._ad_twitch_bot.set_part_event_handler(self._handle_user_left_channel)
+        self._ad_twitch_bot.set_message_event_handler(self._handle_user_sent_message)
+        self._ad_twitch_bot.set_command_event_handler(self._handle_user_command)
 
     def _connect_game_if_events(self):
-        self._game_if.set_response_event_handler(self._handle_game_response)
+        self._game_controller.set_response_event_handler(self._handle_game_response)
 
     def _handle_bot_connected(self):
         pass
 
     def _handle_user_joined_channel(self, user: User):
-        self._game_if.add_active_player(self._player_name(user))
+        self._game_controller.add_active_player(self._player_name(user))
 
     def _handle_user_left_channel(self, user: User):
-        self._game_if.remove_active_player(self._player_name(user))
+        self._game_controller.remove_active_player(self._player_name(user))
 
     def _handle_user_sent_message(self, user: User):
-        self._game_if.add_active_player(self._player_name(user))
+        self._game_controller.add_active_player(self._player_name(user))
 
     def _handle_user_command(self, user: User, command: str, args: list[str]):
-        self._game_if.handle_user_action(self._player_name(user), command, args)
+        self._game_controller.handle_user_action(self._player_name(user), command, args)
 
     def _handle_game_response(self, response: str) -> bool:
-        return self._twitch_if.send_message(response)
+        return self._ad_twitch_bot.send_message(response)
 
     def _player_name(self, user: User) -> str:
-        return user.name
+        return user.name.strip()
 
     def run(self):
         self._ad_twitch_bot.run()
@@ -52,17 +52,19 @@ def main():
     args = parse_args()
     configure_logger()
     game_config = GameConfig.from_file(args.game_config)
+    game_controller = GameController(game_config, args.state_files_directory)
     if args.bot_config is not None:
         bot_config = json.load(args.bot_config)
-        TwitchGameMediator(bot_config, game_config).run()
+        TwitchGameMediator(bot_config, game_controller).run()
     else:
-        Commander(game_config).run()
+        Commander(game_controller).run()
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('game_config', type=argparse.FileType('r'))
     parser.add_argument('-b', '--bot_config', type=argparse.FileType('r'))
+    parser.add_argument('-d', '--state_files_directory', default='.')
     return parser.parse_args()
 
 

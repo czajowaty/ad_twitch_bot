@@ -1,14 +1,14 @@
 import asyncio
 import datetime
 from game.config import Config
-from game.errors import InvalidOperation
-from game.state_machine import StateMachine
+from game.state_machine import StateMachine, StateMachineContext
 from game.state_machine_action import StateMachineAction
 from game import commands
 from game.game_interface import GameInterface
 import logging
 import random
 from typing import Callable
+import os.path
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,36 @@ class Controller(GameInterface):
     class NoPlayerForEvent(Exception):
         pass
 
-    def __init__(self, game_config: Config):
+    STATE_FILE_SUFFIX = '.json'
+
+    def __init__(self, game_config: Config, state_files_directory: str):
         self._game_config = game_config
+        self._state_files_directory = state_files_directory
         self._rng = random.Random()
         self._player_state_machines = {}
         self._active_players = set()
         self._event_timer: asyncio.Task = None
+        self._load_state_files()
+
+    def _load_state_files(self):
+        for file_name in os.listdir(self._state_files_directory):
+            file_path = os.path.join(self._state_files_directory, file_name)
+            if os.path.isfile(file_path):
+                self._load_state_file(file_path)
+
+    def _load_state_file(self, state_file_path: str):
+        _, state_file_name = os.path.split(state_file_path)
+        player_name, file_extension = os.path.splitext(state_file_name)
+        if file_extension != self.STATE_FILE_SUFFIX:
+            logger.debug(f"Non-json file trying to be loaded - {state_file_path}.")
+            return
+        try:
+            with open(state_file_path, mode='r') as state_file:
+                state_machine = StateMachine.load(state_file, self._game_config)
+                self._player_state_machines[player_name] = state_machine
+            logger.info(f"Loaded '{player_name}'s' state.")
+        except IOError as exc:
+            logger.error(f"Error while loading '{player_name}'s' state. Reason - {exc}.")
 
     @property
     def _timers(self) -> Config.Timers:
@@ -40,8 +64,23 @@ class Controller(GameInterface):
         self._response_event_handler = handler
 
     def _send_response(self, player_name: str, responses: list[str]):
-        response_string = '\n'.join(responses)
-        self._response_event_handler(f"{player_name}: {response_string}")
+        for response_string in self._response_string_generator(responses):
+            self._response_event_handler(f"@{player_name}: {response_string}")
+
+    def _response_string_generator(self, responses: list[str]):
+        def responses_group_to_string(responses_group: list[str]):
+            return '\n'.join(responses_group)
+
+        responses_group = []
+        for response in responses:
+            if response == StateMachineContext.RESPONSE_LINE_BREAK:
+                if len(responses_group) > 0:
+                    yield responses_group_to_string(responses_group)
+                responses_group = []
+            else:
+                responses_group.append(response)
+        if len(responses_group) > 0:
+            yield responses_group_to_string(responses_group)
 
     def handle_user_action(self, player_name: str, command: str, args: str):
         self._handle_action(player_name, self._user_action(command, args))
@@ -63,6 +102,22 @@ class Controller(GameInterface):
             self._send_response(player_name, responses)
         if player_state_machine.is_finished():
             self._restart_game(player_name)
+        self._save_player_state(player_name)
+
+    def _save_player_state(self, player_name: str):
+        logger.debug("Saving state for '{player_name}'.")
+        try:
+            with open(self._player_state_file_path(player_name), mode='w') as player_state_file:
+                self._player_state_machine(player_name).save(player_state_file)
+        except IOError as exc:
+            logger.error(f"Could not save state file for '{player_name}'. Reason - {exc}.")
+
+    def _player_state_file_path(self, player_name: str) -> str:
+        return os.path.join(self._state_files_directory, self._player_state_file_name(player_name))
+
+    @classmethod
+    def _player_state_file_name(cls, player_name: str) -> str:
+        return player_name + cls.STATE_FILE_SUFFIX
 
     def _player_state_machine(self, player_name: str) -> StateMachine:
         if not self._does_player_exist(player_name):
@@ -73,18 +128,18 @@ class Controller(GameInterface):
         return player_name in self._player_state_machines
 
     def _restart_game(self, player_name: str):
-        self._player_state_machine(player_name).on_action(self._admin_action(commands.RESTART))
-        self._start_game(player_name)
+        self._handle_action(player_name, self._admin_action(commands.RESTART))
 
     def add_active_player(self, player_name: str):
         if self._is_player_active(player_name):
             return
-        if not self._is_game_started(player_name):
-            self._start_game(player_name)
-        if not self._any_player_active():
-            logger.info(f"First player became active. Starting timers.")
-            self._start_timers()
+        is_first_active_player = not self._any_player_active()
         self._active_players.add(player_name)
+        if not self._does_player_exist(player_name):
+            self._player_state_machines[player_name] = StateMachine(self._game_config, player_name)
+        if is_first_active_player:
+            logger.info(f"First player became active. Starting event.")
+            self._handle_event_timer_expiry()
 
     def _is_game_started(self, player_name: str) -> bool:
         return self._does_player_exist(player_name) and self._player_state_machine(player_name).is_started()
@@ -95,8 +150,7 @@ class Controller(GameInterface):
             self._player_state_machines[player_name] = player_state_machine
         else:
             player_state_machine = self._player_state_machines[player_name]
-        responses = player_state_machine.on_action(self._admin_action(commands.STARTED))
-        self._send_response(player_name, responses)
+        self._handle_action(player_name, self._admin_action(commands.STARTED))
 
     def remove_active_player(self, player_name: str):
         if not self._is_player_active(player_name):
@@ -134,11 +188,8 @@ class Controller(GameInterface):
         except self.NoPlayerForEvent:
             logger.info(f"No eligible players for event.")
             return
-        player_state_machine = self._player_state_machine(player_name)
-        try:
-            self._send_response(player_name, player_state_machine.start_random_event())
-        except InvalidOperation as exc:
-            logger.warning(f"Cannot start event for '{player_name}'. {exc}")
+        event_command = commands.GENERATE_EVENT if self._is_game_started(player_name) else commands.STARTED
+        self._handle_action(player_name, self._admin_action(event_command))
 
     def _select_player_for_event(self) -> str:
         eligible_players = self._event_eligible_players()
@@ -148,7 +199,10 @@ class Controller(GameInterface):
         return self._rng.choices(eligible_players, players_weights)[0]
 
     def _event_eligible_players(self) -> list[str]:
-        return list(filter(self._is_player_waiting_for_event, self._active_players))
+        def is_event_eligible_player(player_name: str) -> bool:
+            return not self._is_game_started(player_name) or self._is_player_waiting_for_event(player_name)
+
+        return list(filter(is_event_eligible_player, self._active_players))
 
     def _is_player_waiting_for_event(self, player_name) -> bool:
         return self._player_state_machine(player_name).is_waiting_for_event()

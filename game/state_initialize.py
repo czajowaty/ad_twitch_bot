@@ -22,6 +22,7 @@ class StateInitialize(StateWithMonster):
                 "If you want to see what commands you can use at given moment type '!adbot help'. "
                 "Have fun and good luck!")
             self._context.set_tutorial_done()
+        self._context.add_response_line_break()
         self._context.add_response(
             "While wandering in the desert, you suddenly notice a huge tower. "
             "Could it be the legendary Monster Tower?! As the legend says, there are great treasures in the tower, "
@@ -45,5 +46,6 @@ class StateEnterTower(StateBase):
         self._context.add_response(
             f"At the entrance to Monster Tower you found a newborn {self._context.familiar.name}. "
             f"It smiles at you and wants to join you in your adventure. You enter the Tower with your new friend "
-            f"(who is definitely not going to betray once you reach the top floor...).")
+            f"(who is definitely not going to betray you once you reach the top floor...).")
+        self._context.add_response_line_break()
         self._context.generate_action(commands.ENTERED_TOWER)

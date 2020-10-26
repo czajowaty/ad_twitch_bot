@@ -65,6 +65,8 @@ class BattleContext:
 
 
 class StateMachineContext:
+    RESPONSE_LINE_BREAK = '\n'
+
     def __init__(self, game_config: Config):
         self._game_config = game_config
         self._is_tutorial_done = False
@@ -210,6 +212,9 @@ class StateMachineContext:
 
     def add_response(self, response: str):
         self._responses.append(response)
+
+    def add_response_line_break(self):
+        self._responses.append(self.RESPONSE_LINE_BREAK)
 
     def take_responses(self) -> list:
         responses = self._responses[:]

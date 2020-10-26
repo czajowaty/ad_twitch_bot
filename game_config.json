@@ -1,6 +1,6 @@
 {
     "timers": {
-        "event_interval": 300,
+        "event_interval": 120,
         "event_penalty_duration": 200,
         "game_restart_wait_time": 1800
     },
@@ -12,12 +12,12 @@
         "with_penalty": 2
     },
     "events_weights": {
-        "battle": 1,
-        "character": 1,
+        "battle": 4,
+        "character": 5,
         "elevator": 1,
-        "item": 1,
-        "trap": 1,
-        "familiar": 1
+        "item": 5,
+        "trap": 3,
+        "familiar": 2
     },
     "found_items_weights": {
         "Pita": 1,

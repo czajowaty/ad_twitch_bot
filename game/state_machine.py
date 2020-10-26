@@ -58,7 +58,7 @@ class StateMachine:
     TRANSITIONS = {
         StateStart: {commands.STARTED: Transition.by_admin(StateInitialize)},
         StateInitialize: {commands.ENTER_TOWER: Transition.by_user(StateEnterTower)},
-        StateEnterTower: {commands.ENTERED_TOWER: Transition.by_admin(StateWaitForEvent)},
+        StateEnterTower: {commands.ENTERED_TOWER: Transition.by_admin(StateGenerateEvent)},
         StateWaitForEvent: {
             commands.GENERATE_EVENT: Transition.by_admin(StateGenerateEvent),
             commands.BATTLE_EVENT: Transition.by_admin(StateBattleEvent),
@@ -203,7 +203,7 @@ class StateMachine:
         json.dump(state_machine_json, f)
 
     @classmethod
-    def load(cls, f, game_config):
+    def load(cls, f, game_config) -> '__class__':
         state_machine_json = json.load(f)
         state_machine = cls(game_config, state_machine_json['player'])
         state_machine._context = StateMachineContext.from_json(state_machine_json['context'], game_config)
@@ -221,22 +221,6 @@ class StateMachine:
 
     def is_waiting_for_event(self) -> bool:
         return self._state.is_waiting_for_event()
-
-    def start_random_event(self):
-        if not self.is_waiting_for_event():
-            raise InvalidOperation('Not waiting for event.')
-        events_weights = self._context.game_config.events_weights
-        events_with_weights = {
-            commands.BATTLE_EVENT: events_weights['battle'],
-            commands.CHARACTER_EVENT: events_weights['character'],
-            commands.ELEVATOR_EVENT: events_weights['elevator'],
-            commands.ITEM_EVENT: events_weights['item'],
-            commands.TRAP_EVENT: events_weights['trap'],
-            commands.FAMILIAR_EVENT: events_weights['familiar']
-        }
-        rng = self._context.rng
-        event_command = rng.choices(list(events_with_weights.keys()), list(events_with_weights.values()))[0]
-        return self.on_action(StateMachineAction(event_command, is_given_by_admin=True))
 
     def on_action(self, action):
         try:
