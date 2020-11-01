@@ -1,8 +1,7 @@
 {
     "timers": {
         "event_interval": 120,
-        "event_penalty_duration": 200,
-        "game_restart_wait_time": 1800
+        "event_penalty_duration": 200
     },
     "probabilities": {
         "flee": 0.65
