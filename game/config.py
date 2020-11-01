@@ -13,7 +13,6 @@ class Config:
         def __init__(self):
             self.event_interval = 0
             self.event_penalty_duration = 0
-            self.game_restart_wait_time = 0
 
     class Probabilities:
         def __init__(self):
@@ -121,7 +120,6 @@ class Config:
         try:
             timers.event_interval = int(timers_json['event_interval'])
             timers.event_penalty_duration = int(timers_json['event_penalty_duration'])
-            timers.game_restart_wait_time = int(timers_json['game_restart_wait_time'])
         except ValueError as exc:
             raise cls.InvalidConfig(f"{timers_json}: {exc}")
 

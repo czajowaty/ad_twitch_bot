@@ -51,7 +51,7 @@ class AdBot(commands.Bot, TwitchInterface):
             return False
         index = 0
         while index < len(message):
-            asyncio.create_task(channel.send(message[index:index + 500]))
+            asyncio.create_task(channel.send(f"/me {message[index:index + 500]}"))
             index += 500
         return True
 
