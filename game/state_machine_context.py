@@ -216,7 +216,10 @@ class StateMachineContext:
     def add_response_line_break(self):
         self._responses.append(self.RESPONSE_LINE_BREAK)
 
+    def peek_responses(self) -> list:
+        return self._responses[:]
+
     def take_responses(self) -> list:
-        responses = self._responses[:]
+        responses = self.peek_responses()
         self._responses.clear()
         return responses

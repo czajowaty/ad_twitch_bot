@@ -54,7 +54,7 @@ class StateGameOver(StateBase):
 
 
 class StateMachine:
-    VERSION = 1
+    VERSION = 2
     TRANSITIONS = {
         StateStart: {commands.STARTED: Transition.by_admin(StateInitialize)},
         StateInitialize: {commands.ENTER_TOWER: Transition.by_user(StateEnterTower)},
@@ -166,6 +166,7 @@ class StateMachine:
     def __init__(self, game_config: dict, player_name: str):
         self._context = StateMachineContext(game_config)
         self._player_name = player_name
+        self._last_responses = []
         self._state = StateStart(self._context)
         self._event_selection_penalty_end_dt = None
         self._generic_actions_handlers = {
@@ -173,7 +174,8 @@ class StateMachine:
             commands.RESTART: (True, self._restart_state_machine),
             commands.SHOW_FAMILIAR_STATS: (False, self._handle_familiar_stats_query),
             commands.SHOW_INVENTORY: (False, self._handle_inventory_query),
-            commands.SHOW_FLOOR: (False, self._handle_floor_query)
+            commands.SHOW_FLOOR: (False, self._handle_floor_query),
+            commands.SHOW_STATE: (False, self._handle_state_query)
         }
 
     @property
@@ -197,6 +199,7 @@ class StateMachine:
         state_machine_json = {
             'version': self.VERSION,
             'player': self.player_name,
+            'responses': self._last_responses,
             'context': self._context.to_json(),
             'state': self._state.to_json()
         }
@@ -206,6 +209,7 @@ class StateMachine:
     def load(cls, f, game_config) -> '__class__':
         state_machine_json = json.load(f)
         state_machine = cls(game_config, state_machine_json['player'])
+        state_machine._last_responses = state_machine_json.get('responses', [])
         state_machine._context = StateMachineContext.from_json(state_machine_json['context'], game_config)
         state_machine._state = StateBase.from_json(state_machine_json['state'], state_machine._context)
         return state_machine
@@ -226,6 +230,7 @@ class StateMachine:
         try:
             if not self._handle_generic_action(action):
                 self._handle_non_generic_action(action)
+                self._last_responses = self._context.peek_responses()
         except InvalidOperation as exc:
             self._context.add_response(str(exc))
         return self._context.take_responses()
@@ -284,6 +289,17 @@ class StateMachine:
             self._context.add_response(f"You are on {self._context.floor + 1}F.")
         else:
             self._handle_generic_action_before_entering_tower()
+
+    def _handle_state_query(self, action):
+        if not self.is_started():
+            self._handle_generic_action_before_entering_tower()
+        elif self.is_waiting_for_event():
+            self._context.add_response(f"You are not in an event.")
+        elif len(self._last_responses) == 0:
+            self._context.add_response(f"No information about previous state.")
+        else:
+            for response in self._last_responses:
+                self._context.add_response(response)
 
     def _handle_generic_action_before_entering_tower(self):
         self._context.add_response(f"You did not enter the tower yet.")
