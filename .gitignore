@@ -3,3 +3,4 @@
 *.pyc
 my_bot_config.json
 *.log
+state_files/*
