@@ -1,7 +1,8 @@
 import asyncio
 import logging
+import random
 from twitch_bot.twitch_interface import TwitchInterface
-from twitchio.dataclasses import Channel, Message, User
+from twitchio.dataclasses import Channel, Message, User, Context
 from twitchio.ext import commands
 from typing import Callable
 
@@ -12,6 +13,7 @@ class AdBot(commands.Bot, TwitchInterface):
     def __init__(self, bot_config):
         self._excluded_user_names = set(bot_config['EXCLUDED_USERS'])
         self._channel_name = bot_config['CHANNEL'].lstrip('#')
+        self._rng = random.Random()
         super().__init__(
             irc_token=bot_config['OATH_TOKEN'],
             client_id=bot_config['CLIENT_ID'],
@@ -51,7 +53,7 @@ class AdBot(commands.Bot, TwitchInterface):
             return False
         index = 0
         while index < len(message):
-            asyncio.create_task(channel.send(f"/me {message[index:index + 500]}"))
+            asyncio.create_task(channel.send_me({message[index:index + 500]}))
             index += 500
         return True
 
@@ -90,3 +92,41 @@ class AdBot(commands.Bot, TwitchInterface):
             return
         command, command_args = args[0], args[1:]
         self._command_event_handler(ctx.author, command, command_args)
+
+    @commands.command(name='rng_range')
+    async def _handle_rng_range_command(self, ctx: Context, *args):
+        if len(args) == 0:
+            await self._send_user_message(
+                ctx.author,
+                ctx.channel,
+                f"Usage: '!rng_range UPPER_LIMIT' or '!rng_range LOWER_LIMIT UPPER_LIMIT'.")
+            return
+        try:
+            if len(args) == 1:
+                random_number = self._rng.randrange(int(args[0]) + 1)
+            else:
+                random_number = self._rng.randint(int(args[0]), int(args[1]))
+        except ValueError:
+            await self._send_user_message(
+                ctx.author,
+                ctx.channel,
+                "LIMITs for !rng_range command must be ordered numbers.")
+            return
+        await self._send_rngesus_message(ctx.author, ctx.channel, random_number)
+
+    @commands.command(name='rng_choice')
+    async def _handle_rng_choice_command(self, ctx: Context, *args):
+        if len(args) == 0:
+            await self._send_user_message(
+                ctx.author,
+                ctx.channel,
+                f"Usage: '!rng_choice OPTION_1 OPTION_2 OPTION_3...'.")
+            return
+        await self._send_rngesus_message(ctx.author, ctx.channel, self._rng.choice(args))
+
+    async def _send_rngesus_message(self, user: User, channel: Channel, value: str):
+        await self._send_user_message(user, channel, f"RNGesus says: {value}.")
+
+    async def _send_user_message(self, user: User, channel: Channel, msg: str):
+        user_name = user.name.strip()
+        await channel.send_me(f"@{user_name}: {msg}")
