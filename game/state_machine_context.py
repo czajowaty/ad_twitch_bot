@@ -179,7 +179,7 @@ class StateMachineContext:
             raise InvalidOperation(f'Battle not started')
         self.clear_battle_context()
 
-    def generate_monster(self, floor: int, level_increase: int=0) -> Unit:
+    def generate_floor_monster(self, floor: int, level_increase: int=0) -> Unit:
         highest_floor = self.game_config.highest_floor
         if floor > highest_floor:
             raise InvalidOperation(f'Highest floor is {highest_floor}')

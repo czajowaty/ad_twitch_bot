@@ -8,15 +8,43 @@ from game.state_machine_context import BattleContext
 from game.statuses import Statuses
 from game.talents import Talents
 from game.unit import Unit
+from game.unit_creator import UnitCreator
 
 DamageRoll = DamageCalculator.DamageRoll
 RelativeHeight = DamageCalculator.RelativeHeight
 
 
 class StateBattleEvent(StateBase):
+    def __init__(self, context, monster_traits: dict=None, monster_level: int=0):
+        super().__init__(context)
+        self._monster_traits = monster_traits
+        self._monster_level = monster_level
+
     def on_enter(self):
-        monster = self._context.generate_monster(floor=self._context.floor)
-        self._context.generate_action(commands.START_BATTLE, monster)
+        self._context.generate_action(commands.START_BATTLE, self._select_enemy())
+
+    def _select_enemy(self):
+        if self._monster_traits is None:
+            return self._context.generate_floor_monster(floor=self._context.floor)
+        else:
+            monster_level = self._monster_level if self._monster_level > 0 else self._context.familiar.level
+            return UnitCreator(self._monster_traits).create(monster_level)
+
+    @classmethod
+    def _parse_args(cls, context, args):
+        if len(args) == 0:
+            return ()
+        monster_name = args[0]
+        if monster_name not in context.game_config.monsters_traits.keys():
+            raise cls.ArgsParseError('Unknown monster')
+        monster_traits = context.game_config.monsters_traits[monster_name]
+        monster_level = 0
+        if len(args) > 1:
+            try:
+                monster_level = int(args[1])
+            except ValueError:
+                raise cls.ArgsParseError('Monster level is not a number')
+        return monster_traits, monster_level
 
 
 class StateBattleBase(StateBase):

@@ -75,7 +75,7 @@ class StateCharacterEvent(StateBase):
 
     def _handle_beldo_encounter(self):
         floor = min(self._context.floor + 1, self.game_config.highest_floor)
-        monster = self._context.generate_monster(floor, level_increase=1)
+        monster = self._context.generate_floor_monster(floor, level_increase=1)
         return (commands.START_BATTLE, (monster,)), \
             'He is accompanied by a strong monster, which takes its interest in you... ' \
             'Beldo leaves laughing maniacally.'
