@@ -2,6 +2,7 @@ import datetime
 import json
 from game import commands
 from game.errors import InvalidOperation
+from game.items import normalize_item_name, all_items
 from game.state_base import StateBase
 from game.state_battle import StateBattleEvent, StateStartBattle, StateBattlePreparePhase, StateBattleApproach, \
     StateBattlePhase, StateBattlePlayerTurn, StateEnemyStats, StateBattleAttack, StateBattleUseSpell, \
@@ -177,7 +178,10 @@ class StateMachine:
             commands.SHOW_FAMILIAR_STATS: (False, self._handle_familiar_stats_query),
             commands.SHOW_INVENTORY: (False, self._handle_inventory_query),
             commands.SHOW_FLOOR: (False, self._handle_floor_query),
-            commands.SHOW_STATE: (False, self._handle_state_query)
+            commands.SHOW_STATE: (False, self._handle_state_query),
+            commands.GIVE_ITEM: (True, self._give_item),
+            commands.RESTORE_HP: (True, self._restore_hp),
+            commands.RESTORE_MP: (True, self._restore_mp)
         }
 
     @property
@@ -257,6 +261,7 @@ class StateMachine:
     def _restart_state_machine(self, action):
         if action.is_given_by_admin:
             self._state = StateStart(self._context)
+            logger.info(f"Restarted game for {self.player_name}.")
 
     def _available_specific_commands(self, is_admin: bool):
         available_specific_commands = []
@@ -302,6 +307,40 @@ class StateMachine:
         else:
             for response in self._last_responses:
                 self._context.add_response(response)
+
+    def _give_item(self, action):
+        if not self._has_entered_tower():
+            logger.warning(f"{self.player_name} has not entered tower yet.")
+            return
+        item = self._find_item(*action.args)
+        if item is None:
+            logger.warning(f"Item by name '{' '.join(action.args)}' does not exist.")
+            return
+        self._context.inventory.add_item(item)
+        self._context.add_response(f"You were given {item.name} by unknown power.")
+
+    def _find_item(self, *item_name_parts):
+        if len(item_name_parts) < 1:
+            return None
+        searched_item_name = normalize_item_name(*item_name_parts)
+        for item in all_items():
+            if normalize_item_name(item.name).startswith(searched_item_name):
+                return item
+        return None
+
+    def _restore_hp(self, action):
+        if not self._has_entered_tower():
+            logger.warning(f"{self.player_name} has not entered tower yet.")
+            return
+        self._context.familiar.restore_hp()
+        self._context.add_response(f"Your HP was restored by unknown power.")
+
+    def _restore_mp(self, action):
+        if not self._has_entered_tower():
+            logger.warning(f"{self.player_name} has not entered tower yet.")
+            return
+        self._context.familiar.restore_mp()
+        self._context.add_response(f"Your MP was restored by unknown power.")
 
     def _handle_generic_action_before_entering_tower(self):
         self._context.add_response(f"You did not enter the tower yet.")
