@@ -20,8 +20,7 @@ class Commander:
         return True
 
     def run(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self._get_and_execute_commands())
+        asyncio.run(self._get_and_execute_commands())
 
     async def _get_and_execute_commands(self):
         while True:

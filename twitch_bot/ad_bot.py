@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdBot(commands.Bot, TwitchInterface):
-    def __init__(self, bot_config):
+    def __init__(self, bot_config: dict, loop=None):
         self._excluded_user_names = set(bot_config['EXCLUDED_USERS'])
         self._channel_name = bot_config['CHANNEL'].lstrip('#')
         self._rng = random.Random()
@@ -19,7 +19,8 @@ class AdBot(commands.Bot, TwitchInterface):
             client_id=bot_config['CLIENT_ID'],
             prefix=bot_config['PREFIX'],
             nick=bot_config['NICK'],
-            initial_channels=[self._channel_name])
+            initial_channels=[self._channel_name],
+            loop=loop)
 
     def set_bot_connected_event_handler(self, handler: Callable):
         self._bot_connected_event_handler = handler
@@ -53,7 +54,7 @@ class AdBot(commands.Bot, TwitchInterface):
             return False
         index = 0
         while index < len(message):
-            asyncio.create_task(channel.send_me({message[index:index + 500]}))
+            asyncio.create_task(channel.send_me(message[index:index + 500]))
             index += 500
         return True
 

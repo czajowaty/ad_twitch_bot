@@ -120,11 +120,11 @@ class Controller(GameInterface):
         return player_name + cls.STATE_FILE_SUFFIX
 
     def _player_state_machine(self, player_name: str) -> StateMachine:
-        if not self._does_player_exist(player_name):
+        if not self.does_player_exist(player_name):
             raise self.PlayerDoesNotExist(player_name)
         return self._player_state_machines[player_name]
 
-    def _does_player_exist(self, player_name: str) -> bool:
+    def does_player_exist(self, player_name: str) -> bool:
         return player_name in self._player_state_machines
 
     def _restart_game(self, player_name: str):
@@ -135,14 +135,14 @@ class Controller(GameInterface):
             return
         is_first_active_player = not self._any_player_active()
         self._active_players.add(player_name)
-        if not self._does_player_exist(player_name):
+        if not self.does_player_exist(player_name):
             self._player_state_machines[player_name] = StateMachine(self._game_config, player_name)
         if is_first_active_player:
             logger.info(f"First player became active. Starting event.")
             self._handle_event_timer_expiry()
 
     def _is_game_started(self, player_name: str) -> bool:
-        return self._does_player_exist(player_name) and self._player_state_machine(player_name).is_started()
+        return self.does_player_exist(player_name) and self._player_state_machine(player_name).is_started()
 
     def _start_game(self, player_name: str):
         if player_name not in self._player_state_machines:

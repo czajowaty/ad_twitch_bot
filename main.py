@@ -1,14 +1,17 @@
 import argparse
+import asyncio
 import json
 from commander.commander import Commander
+from commander.remote_commander_server import RemoteCommanderServer
+from commander.remote_commands_handler import RemoteCommandsHandler
 from game.controller import Controller as GameController, Config as GameConfig
 import logging.handlers
 from twitch_bot.ad_bot import AdBot, User
 
 
 class TwitchGameMediator:
-    def __init__(self, bot_config: dict, game_controller: GameController):
-        self._ad_twitch_bot = AdBot(bot_config)
+    def __init__(self, ad_twitch_bot: AdBot, game_controller: GameController):
+        self._ad_twitch_bot = ad_twitch_bot
         self._game_controller = game_controller
         self._connect_twitch_if_events()
         self._connect_game_if_events()
@@ -48,14 +51,24 @@ class TwitchGameMediator:
         self._ad_twitch_bot.run()
 
 
+def sss(sss: str):
+    pass
+
+
 def main():
     args = parse_args()
     configure_logger()
+    event_loop = asyncio.get_event_loop()
     game_config = GameConfig.from_file(args.game_config)
     game_controller = GameController(game_config, args.state_files_directory)
+    if args.server_port is not None:
+        remote_commands_handler = RemoteCommandsHandler(game_controller)
+        remote_commander_server = RemoteCommanderServer(args.server_port, remote_commands_handler.handle_command)
+        event_loop.create_task(remote_commander_server.start())
     if args.bot_config is not None:
         bot_config = json.load(args.bot_config)
-        TwitchGameMediator(bot_config, game_controller).run()
+        ad_twitch_bot = AdBot(bot_config, event_loop)
+        TwitchGameMediator(ad_twitch_bot, game_controller).run()
     else:
         Commander(game_controller).run()
 
@@ -65,6 +78,7 @@ def parse_args():
     parser.add_argument('game_config', type=argparse.FileType('r'))
     parser.add_argument('-b', '--bot_config', type=argparse.FileType('r'))
     parser.add_argument('-d', '--state_files_directory', default='.')
+    parser.add_argument('-p', '--server_port', type=int)
     return parser.parse_args()
 
 
