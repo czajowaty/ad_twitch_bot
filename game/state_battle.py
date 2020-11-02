@@ -255,7 +255,7 @@ class StateBattlePhase(StateBattlePhaseBase):
         familiar = self._context.familiar
         if familiar.has_any_status():
             familiar.clear_statuses()
-            self._context.add_response(f"All statuses has been removed.")
+            self._context.add_response(f"All statuses have been cleared.")
 
     def _handle_enemy_defeated(self):
         enemy = self._battle_context.enemy
