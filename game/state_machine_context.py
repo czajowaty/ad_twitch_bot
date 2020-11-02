@@ -23,7 +23,7 @@ class BattleContext:
         self._finished = False
 
     @property
-    def enemy(self):
+    def enemy(self) -> Unit:
         return self._enemy
 
     def start_prepare_phase(self, counter: int):

@@ -290,6 +290,12 @@ class StateBattlePlayerTurn(StateBattlePhaseBase):
         return True
 
 
+class StateEnemyStats(StateBattleBase):
+    def on_enter(self):
+        self._context.add_response(f"Enemy stats: {self._battle_context.enemy.to_string()}.")
+        self._context.generate_action(commands.PLAYER_TURN)
+
+
 class StateBattleAttack(StateBattlePhaseBase):
     def on_enter(self):
         familiar = self._context.familiar

@@ -4,8 +4,8 @@ from game import commands
 from game.errors import InvalidOperation
 from game.state_base import StateBase
 from game.state_battle import StateBattleEvent, StateStartBattle, StateBattlePreparePhase, StateBattleApproach, \
-    StateBattlePhase, StateBattlePlayerTurn, StateBattleAttack, StateBattleUseSpell, StateBattleUseItem, \
-    StateBattleTryToFlee, StateBattleEnemyTurn
+    StateBattlePhase, StateBattlePlayerTurn, StateEnemyStats, StateBattleAttack, StateBattleUseSpell, \
+    StateBattleUseItem, StateBattleTryToFlee, StateBattleEnemyTurn
 from game.state_character import StateCharacterEvent, StateItemTrade, StateItemTradeAccepted, StateItemTradeRejected, \
     StateFamiliarTrade, StateFamiliarTradeAccepted, StateFamiliarTradeRejected, StateEvolveFamiliar
 from game.state_elevator import StateElevatorEvent, StateGoUp, StateElevatorOmitted, StateNextFloor
@@ -84,11 +84,13 @@ class StateMachine:
             commands.YOU_DIED: Transition.by_admin(StateGameOver)
         },
         StateBattlePlayerTurn: {
+            commands.ENEMY_STATS: Transition.by_user(StateEnemyStats),
             commands.ATTACK: Transition.by_user(StateBattleAttack),
             commands.USE_SPELL: Transition.by_user(StateBattleUseSpell),
             commands.USE_ITEM: Transition.by_user(StateBattleUseItem),
             commands.FLEE: Transition.by_user(StateBattleTryToFlee)
         },
+        StateEnemyStats: {commands.PLAYER_TURN: Transition.by_admin(StateBattlePlayerTurn)},
         StateBattleAttack: {commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase)},
         StateBattleUseSpell: {
             commands.BATTLE_ACTION_PERFORMED: Transition.by_admin(StateBattlePhase),
