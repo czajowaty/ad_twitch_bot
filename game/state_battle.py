@@ -126,7 +126,12 @@ class StateBattlePhaseBase(StateBattleBase):
             damage = damage_calculator.physical_damage(self._select_damage_roll(), relative_height, is_critical)
             defender.deal_damage(damage)
             physical_attack_descriptor = damage, relative_height, is_critical
-            return self._physical_attack_hit_response(attacker, defender, physical_attack_descriptor)
+            response = self._physical_attack_hit_response(attacker, defender, physical_attack_descriptor)
+            if defender.talents.has(Talents.ElectricShock):
+                shock_damage = max(damage // 4, 1)
+                attacker.deal_damage(shock_damage)
+                response += ' ' + self._shock_damage_response(attacker, defender, shock_damage)
+            return response
 
     def _perform_spell_attack(self, attacker: Unit, defender: Unit):
         damage = DamageCalculator(attacker, defender).spell_damage()
@@ -209,6 +214,17 @@ class StateBattlePhaseBase(StateBattleBase):
         response += f'dealing {damage} damage. {defender_name().capitalize()} '
         response += 'has' if is_familiar_attack() else 'have'
         response += f' {defender.hp} HP left.'
+        return response
+
+    def _shock_damage_response(self, attacker: Unit, defender: Unit, shock_damage: int):
+        def is_familiar_attack() -> bool:
+            return attacker is self._context.familiar
+
+        response = 'Electrical shock runs through '
+        response += 'your' if is_familiar_attack() else f'{attacker.name}\'s'
+        response += f' body dealing {shock_damage} damage. '
+        response += 'You have' if is_familiar_attack() else f'{attacker.name} has'
+        response += f' {attacker.hp} HP left.'
         return response
 
     def _spell_attack_response(self, attacker: Unit, defender: Unit, damage: int):

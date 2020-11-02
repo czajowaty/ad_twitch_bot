@@ -65,7 +65,7 @@ class Unit:
         return self.level >= self._levels.max_level
 
     @property
-    def talents(self):
+    def talents(self) -> Talents:
         return self._talents
 
     @property
