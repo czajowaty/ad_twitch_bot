@@ -35,7 +35,7 @@ class DamageCalculator:
     def spell_damage(self) -> int:
         spell = self._attacker.spell
         base_damage = (spell.traits.base_damage + spell.level) * 2
-        damage_dealt = (base_damage + self._spell_combat_damage(base_damage) - self._base_defense()) // 2
+        damage_dealt = int((base_damage + self._spell_combat_damage(base_damage) - self._base_defense()) // 2)
         return max(damage_dealt, 1)
 
     def _base_defense(self):

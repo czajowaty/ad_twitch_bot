@@ -425,6 +425,13 @@ class StateBattleEnemyTurn(StateBattlePhaseBase):
         else:
             familiar = self._context.familiar
             enemy = self._battle_context.enemy
-            response = self._perform_physical_attack(attacker=enemy, defender=familiar)
+            perform_spell_attack = False
+            if enemy.has_spell() and enemy.has_enough_mp_for_spell():
+                perform_spell_attack = self._context.does_action_succeed(
+                    self.game_config.probabilities.enemy_spell_attack)
+            if perform_spell_attack:
+                response = self._perform_spell_attack(attacker=enemy, defender=familiar)
+            else:
+                response = self._perform_physical_attack(attacker=enemy, defender=familiar)
             self._context.add_response(response)
         self._context.generate_action(commands.BATTLE_ACTION_PERFORMED)

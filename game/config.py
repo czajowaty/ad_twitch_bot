@@ -17,6 +17,7 @@ class Config:
     class Probabilities:
         def __init__(self):
             self.flee = 0.0
+            self.enemy_spell_attack = 0.0
 
     class PlayerSelectionWeights:
         def __init__(self):
@@ -127,6 +128,7 @@ class Config:
     def _read_probabilities(cls, probabilities, probabilities_json):
         try:
             probabilities.flee = float(probabilities_json['flee'])
+            probabilities.enemy_spell_attack = float(probabilities_json['enemy_spell_attack'])
         except ValueError as exc:
             raise cls.InvalidConfig(f"{probabilities_json}: {exc}")
 
