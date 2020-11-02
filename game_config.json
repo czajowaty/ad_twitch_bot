@@ -4,7 +4,8 @@
         "event_penalty_duration": 200
     },
     "probabilities": {
-        "flee": 0.65
+        "flee": 0.65,
+        "enemy_spell_attack": 0.2
     },
     "player_selection_weights": {
         "without_penalty": 10,
