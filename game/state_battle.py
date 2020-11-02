@@ -252,9 +252,10 @@ class StateBattlePhase(StateBattlePhaseBase):
                 self._context.generate_action(commands.ENEMY_TURN)
 
     def _clear_statuses(self):
-        # TODO: Maybe add some responses about cleared statuses
         familiar = self._context.familiar
-        familiar.clear_statuses()
+        if familiar.has_any_status():
+            familiar.clear_statuses()
+            self._context.add_response(f"All statuses has been removed.")
 
     def _handle_enemy_defeated(self):
         enemy = self._battle_context.enemy
