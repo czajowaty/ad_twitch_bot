@@ -105,7 +105,7 @@ class Controller(GameInterface):
         self._save_player_state(player_name)
 
     def _save_player_state(self, player_name: str):
-        logger.debug("Saving state for '{player_name}'.")
+        logger.debug(f"Saving state for '{player_name}'.")
         try:
             with open(self._player_state_file_path(player_name), mode='w') as player_state_file:
                 self._player_state_machine(player_name).save(player_state_file)
