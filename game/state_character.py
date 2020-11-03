@@ -121,6 +121,7 @@ class StateItemTradeAccepted(StateWithInventoryItem):
 
 class StateItemTradeRejected(StateBase):
     def on_enter(self):
+        self._context.clear_item_buffer()
         self._context.add_response(f"Fur leaves looking a bit mad. Maybe you made a mistake...")
         self._context.generate_action(commands.EVENT_FINISHED)
 
